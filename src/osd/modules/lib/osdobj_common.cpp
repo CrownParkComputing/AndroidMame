@@ -242,6 +242,7 @@ void osd_common_t::register_options()
 	REGISTER_MODULE(m_mod_man, RENDERER_SDL3SOFT);
 #endif
 #else
+	REGISTER_MODULE(m_mod_man, RENDERER_ANDROID_NATIVE);
 	REGISTER_MODULE(m_mod_man, RENDERER_SDL2);
 #if !defined(SDLMAME_EMSCRIPTEN)
 	REGISTER_MODULE(m_mod_man, RENDERER_SDL1);
@@ -253,6 +254,7 @@ void osd_common_t::register_options()
 	REGISTER_MODULE(m_mod_man, SOUND_XAUDIO2);
 	REGISTER_MODULE(m_mod_man, SOUND_COREAUDIO);
 	REGISTER_MODULE(m_mod_man, SOUND_JS);
+	REGISTER_MODULE(m_mod_man, SOUND_ANDROID);
 #ifdef SDLMAME_SDL3
 	REGISTER_MODULE(m_mod_man, SOUND_SDL3);
 #else

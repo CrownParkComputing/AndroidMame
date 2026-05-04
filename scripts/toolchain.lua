@@ -465,6 +465,7 @@ function toolchain(_buildDir, _subDir)
 			"-Wl,-z,noexecstack",
 			"-Wl,-z,relro",
 			"-Wl,-z,now",
+			"-Wl,-z,max-page-size=16384",
 		}
 
 	configuration { "android-arm" }

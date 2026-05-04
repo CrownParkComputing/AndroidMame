@@ -83,6 +83,13 @@ int main(int argc, char** argv)
 #if defined(SDLMAME_ANDROID)
 	// Enable standard application logging
 	SDL_SetLogPriority(SDL_LOG_CATEGORY_APPLICATION, SDL_LOG_PRIORITY_VERBOSE);
+	// Trap the Android back button so SDL3 delivers SDLK_AC_BACK as an SDL
+	// key event instead of calling manualBackButton() → Activity.finish().
+	// Without this, KEYCODE_BUTTON_B can reach onNativeKeyDown() (when the
+	// gamepad has not yet been registered as an SDL joystick) and SDL3's C
+	// layer calls manualBackButton() which bypasses MAME's onBackPressed()
+	// override via SDLActivity.superOnBackPressed() → Activity.onBackPressed().
+	SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
 #endif
 
 #if defined(SDLMAME_MACOSX) && SDL_VERSION_ATLEAST(3, 4, 0)

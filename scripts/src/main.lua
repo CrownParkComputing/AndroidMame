@@ -25,6 +25,7 @@ end
 	kind "ConsoleApp"
 
 	configuration { "android*" }
+		local androidsdl = (_OPTIONS["osd"] == "sdl3") and "SDL3" or "SDL2"
 		targetprefix "lib"
 		targetname "main"
 		targetextension ".so"
@@ -36,7 +37,8 @@ end
 			"EGL",
 			"GLESv1_CM",
 			"GLESv2",
-			"SDL2",
+			"OpenSLES",
+			androidsdl,
 		}
 
 	configuration {  }
@@ -90,28 +92,41 @@ end
 
 	if _OPTIONS["targetos"]=="android" then
 		files {
-			MAME_DIR .. "src/osd/sdl/android_main.cpp",
+			MAME_DIR .. "src/osd/" .. _OPTIONS["osd"] .. "/android_main.cpp",
 		}
 		targetsuffix ""
 		if _OPTIONS["SEPARATE_BIN"]~="1" then
+			-- SDL_INSTALL_ROOT may be omitted when SDL3 is built from the
+			-- 3rdparty/SDL3 submodule at build time; in that case build-native-android.sh
+			-- copies the .so directly, so we skip the premake-time copy.
+			local sdl_root = _OPTIONS["SDL_INSTALL_ROOT"]
+			local sdl_lib  = sdl_root and (sdl_root .. "/lib/lib" .. androidsdl .. ".so") or nil
 			if _OPTIONS["PLATFORM"]=="arm" then
 				targetdir(MAME_DIR .. "android-project/app/src/main/libs/armeabi-v7a")
-				os.copyfile(_OPTIONS["SDL_INSTALL_ROOT"] .. "/lib/libSDL2.so", MAME_DIR .. "android-project/app/src/main/libs/armeabi-v7a/libSDL2.so")
+				if sdl_lib then
+					os.copyfile(sdl_lib, MAME_DIR .. "android-project/app/src/main/libs/armeabi-v7a/lib" .. androidsdl .. ".so")
+				end
 				os.copyfile(androidToolchainRoot() .. "/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so", MAME_DIR .. "android-project/app/src/main/libs/armeabi-v7a/libc++_shared.so")
 			end
 			if _OPTIONS["PLATFORM"]=="arm64" then
 				targetdir(MAME_DIR .. "android-project/app/src/main/libs/arm64-v8a")
-				os.copyfile(_OPTIONS["SDL_INSTALL_ROOT"] .. "/lib/libSDL2.so", MAME_DIR .. "android-project/app/src/main/libs/arm64-v8a/libSDL2.so")
+				if sdl_lib then
+					os.copyfile(sdl_lib, MAME_DIR .. "android-project/app/src/main/libs/arm64-v8a/lib" .. androidsdl .. ".so")
+				end
 				os.copyfile(androidToolchainRoot() .. "/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so", MAME_DIR .. "android-project/app/src/main/libs/arm64-v8a/libc++_shared.so")
 			end
 			if _OPTIONS["PLATFORM"]=="x86" then
 				targetdir(MAME_DIR .. "android-project/app/src/main/libs/x86")
-				os.copyfile(_OPTIONS["SDL_INSTALL_ROOT"] .. "/lib/libSDL2.so", MAME_DIR .. "android-project/app/src/main/libs/x86/libSDL2.so")
+				if sdl_lib then
+					os.copyfile(sdl_lib, MAME_DIR .. "android-project/app/src/main/libs/x86/lib" .. androidsdl .. ".so")
+				end
 				os.copyfile(androidToolchainRoot() .. "/sysroot/usr/lib/i686-linux-android/libc++_shared.so", MAME_DIR .. "android-project/app/src/main/libs/x86/libc++_shared.so")
 			end
 			if _OPTIONS["PLATFORM"]=="x64" then
 				targetdir(MAME_DIR .. "android-project/app/src/main/libs/x86_64")
-				os.copyfile(_OPTIONS["SDL_INSTALL_ROOT"] .. "/lib/libSDL2.so", MAME_DIR .. "android-project/app/src/main/libs/x86_64/libSDL2.so")
+				if sdl_lib then
+					os.copyfile(sdl_lib, MAME_DIR .. "android-project/app/src/main/libs/x86_64/lib" .. androidsdl .. ".so")
+				end
 				os.copyfile(androidToolchainRoot() .. "/sysroot/usr/lib/x86_64-linux-android/libc++_shared.so", MAME_DIR .. "android-project/app/src/main/libs/x86_64/libc++_shared.so")
 			end
 		end

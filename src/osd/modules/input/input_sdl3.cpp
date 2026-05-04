@@ -1951,56 +1951,56 @@ public:
 			// took secondary Y
 		}
 
-		// try to assign X button to UI clear
-		if (add_button_assignment(assignments, IPT_UI_CLEAR, { buttonitems[SDL_GAMEPAD_BUTTON_WEST] }))
-		{
-			buttonitems[SDL_GAMEPAD_BUTTON_WEST] = ITEM_ID_INVALID;
-		}
-		else
-		{
-			// otherwise try to find an unassigned button
-			for (auto [item, button, axis] : numberedbuttons)
-			{
-				if ((SDL_GAMEPAD_BUTTON_INVALID != button) && (ITEM_ID_INVALID != buttonitems[button]))
-				{
-					add_button_assignment(assignments, IPT_UI_CLEAR, { item });
-					buttonitems[button] = ITEM_ID_INVALID;
-					break;
-				}
-				else if ((SDL_GAMEPAD_AXIS_INVALID != axis) && (ITEM_ID_INVALID != axisitems[axis].second))
-				{
-					add_button_assignment(assignments, IPT_UI_CLEAR, { item });
-					axisitems[axis].second = ITEM_ID_INVALID;
-					break;
-				}
-			}
-		}
-
-		// try to assign B button to UI back
-		if (add_button_assignment(assignments, IPT_UI_BACK, { buttonitems[SDL_GAMEPAD_BUTTON_EAST] }))
-		{
-			buttonitems[SDL_GAMEPAD_BUTTON_WEST] = ITEM_ID_INVALID;
-		}
-		else
-		{
-			// otherwise try to find an unassigned button
-			for (auto [item, button, axis] : numberedbuttons)
-			{
-				if ((SDL_GAMEPAD_BUTTON_INVALID != button) && (ITEM_ID_INVALID != buttonitems[button]))
-				{
-					add_button_assignment(assignments, IPT_UI_CLEAR, { item });
-					buttonitems[button] = ITEM_ID_INVALID;
-					break;
-				}
-				else if ((SDL_GAMEPAD_AXIS_INVALID != axis) && (ITEM_ID_INVALID != axisitems[axis].second))
-				{
-					add_button_assignment(assignments, IPT_UI_CLEAR, { item });
-					axisitems[axis].second = ITEM_ID_INVALID;
-					break;
-				}
-			}
-		}
-
+		// [DISABLED] // try to assign X button to UI clear
+		// [DISABLED] if (add_button_assignment(assignments, IPT_UI_CLEAR, { buttonitems[SDL_GAMEPAD_BUTTON_WEST] }))
+		// [DISABLED] {
+		// [DISABLED] buttonitems[SDL_GAMEPAD_BUTTON_WEST] = ITEM_ID_INVALID;
+		// [DISABLED] }
+		// [DISABLED] else
+		// [DISABLED] {
+		// [DISABLED] // otherwise try to find an unassigned button
+		// [DISABLED] for (auto [item, button, axis] : numberedbuttons)
+		// [DISABLED] {
+		// [DISABLED] if ((SDL_GAMEPAD_BUTTON_INVALID != button) && (ITEM_ID_INVALID != buttonitems[button]))
+		// [DISABLED] {
+		// [DISABLED] add_button_assignment(assignments, IPT_UI_CLEAR, { item });
+		// [DISABLED] buttonitems[button] = ITEM_ID_INVALID;
+		// [DISABLED] break;
+		// [DISABLED] }
+		// [DISABLED] else if ((SDL_GAMEPAD_AXIS_INVALID != axis) && (ITEM_ID_INVALID != axisitems[axis].second))
+		// [DISABLED] {
+		// [DISABLED] add_button_assignment(assignments, IPT_UI_CLEAR, { item });
+		// [DISABLED] axisitems[axis].second = ITEM_ID_INVALID;
+		// [DISABLED] break;
+		// [DISABLED] }
+		// [DISABLED] }
+		// [DISABLED] }
+		//
+		// [DISABLED] // try to assign B button to UI back
+		// [DISABLED] if (add_button_assignment(assignments, IPT_UI_BACK, { buttonitems[SDL_GAMEPAD_BUTTON_EAST] }))
+		// [DISABLED] {
+		// [DISABLED] buttonitems[SDL_GAMEPAD_BUTTON_WEST] = ITEM_ID_INVALID;
+		// [DISABLED] }
+		// [DISABLED] else
+		// [DISABLED] {
+		// [DISABLED] // otherwise try to find an unassigned button
+		// [DISABLED] for (auto [item, button, axis] : numberedbuttons)
+		// [DISABLED] {
+		// [DISABLED] if ((SDL_GAMEPAD_BUTTON_INVALID != button) && (ITEM_ID_INVALID != buttonitems[button]))
+		// [DISABLED] {
+		// [DISABLED] add_button_assignment(assignments, IPT_UI_CLEAR, { item });
+		// [DISABLED] buttonitems[button] = ITEM_ID_INVALID;
+		// [DISABLED] break;
+		// [DISABLED] }
+		// [DISABLED] else if ((SDL_GAMEPAD_AXIS_INVALID != axis) && (ITEM_ID_INVALID != axisitems[axis].second))
+		// [DISABLED] {
+		// [DISABLED] add_button_assignment(assignments, IPT_UI_CLEAR, { item });
+		// [DISABLED] axisitems[axis].second = ITEM_ID_INVALID;
+		// [DISABLED] break;
+		// [DISABLED] }
+		// [DISABLED] }
+		// [DISABLED] }
+		//
 		// try to assign Y button to UI help
 		if (add_button_assignment(assignments, IPT_UI_HELP, { buttonitems[SDL_GAMEPAD_BUTTON_NORTH] }))
 		{

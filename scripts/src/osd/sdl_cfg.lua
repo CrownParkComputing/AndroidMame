@@ -108,9 +108,16 @@ if BASE_TARGETOS=="unix" then
 			}
 		end
 	elseif _OPTIONS["targetos"]=="android" then
-		buildoptions {
-			backtick(sdlconfigcmd() .. " --cflags | sed 's:/SDL2::'"),
-		}
+		local androidsdl = androidsdlroot()
+		if androidsdl then
+			includedirs {
+				path.join(androidsdl, "include"),
+			}
+		else
+			buildoptions {
+				backtick(sdlconfigcmd() .. " --cflags | sed 's:/SDL2::'"),
+			}
+		end
 	else
 		buildoptions {
 			backtick(sdlconfigcmd() .. " --cflags"),

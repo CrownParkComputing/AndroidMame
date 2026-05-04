@@ -89,6 +89,23 @@ FUNCTOR(op_rgb15pal_argb1555,
 			(palbase[(src >> 5) & 0x1f] & 0xf8) << 2 |
 			(palbase[src & 0x1f] & 0xf8) >> 3 | 0x8000; )
 
+FUNCTOR(op_pal16_rgb565,
+		return (palbase[src] & 0xf80000) >> 8 |
+			(palbase[src] & 0x00fc00) >> 5 |
+			(palbase[src] & 0x0000f8) >> 3; )
+
+FUNCTOR(op_rgb15_rgb565,
+		return ((src & 0x7c00) << 1) |
+			((src & 0x03e0) << 1) |
+			((src & 0x03e0) >> 4) |
+			(src & 0x001f); )
+
+FUNCTOR(op_rgb15pal_rgb565,
+		const uint32_t p = palbase[0x40 + ((src >> 10) & 0x1f)] |
+			palbase[0x20 + ((src >> 5) & 0x1f)] |
+			palbase[0x00 + ((src >> 0) & 0x1f)];
+		return (p & 0xf80000) >> 8 | (p & 0x00fc00) >> 5 | (p & 0x0000f8) >> 3; )
+
 FUNCTOR(op_yuv16_uyvy, return src; )
 FUNCTOR(op_yuv16pal_uyvy, return (palbase[(src >> 8) & 0xff] << 8) | (src & 0x00ff); )
 
@@ -214,6 +231,9 @@ TEXCOPYA(rgb15pal_argb32,  uint16_t, uint32_t, 1)
 TEXCOPYA(pal16_argb1555,  uint16_t, uint16_t, 1)
 TEXCOPYA(rgb15_argb1555,  uint16_t, uint16_t, 1)
 TEXCOPYA(rgb15pal_argb1555,  uint16_t, uint16_t, 1)
+TEXCOPYA(pal16_rgb565,  uint16_t, uint16_t, 1)
+TEXCOPYA(rgb15_rgb565,  uint16_t, uint16_t, 1)
+TEXCOPYA(rgb15pal_rgb565,  uint16_t, uint16_t, 1)
 
 TEXCOPYP(argb32_argb32,  uint32_t, uint32_t)
 TEXCOPYA(argb32_rgb32, uint32_t, uint32_t, 1)
@@ -248,6 +268,9 @@ TEXROTA(rgb15pal_argb32,  uint16_t, uint32_t)
 TEXROTA(pal16_argb1555,  uint16_t, uint16_t)
 TEXROTA(rgb15_argb1555,  uint16_t, uint16_t)
 TEXROTA(rgb15pal_argb1555,  uint16_t, uint16_t)
+TEXROTA(pal16_rgb565,  uint16_t, uint16_t)
+TEXROTA(rgb15_rgb565,  uint16_t, uint16_t)
+TEXROTA(rgb15pal_rgb565,  uint16_t, uint16_t)
 
 TEXROTA(argb32_rgb32, uint32_t, uint32_t)
 TEXROTA(pal16a_rgb32,  uint16_t, uint32_t)

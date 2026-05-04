@@ -93,6 +93,10 @@ function maintargetosdoptions(_target,_subtarget)
 			"network",
 			"bsd",
 		}
+	elseif _OPTIONS["targetos"]=="android" then
+		links {
+			"OpenSLES",
+		}
 	end
 
 	configuration { "mingw*" or "vs*" }
@@ -113,6 +117,20 @@ function sdlconfigcmd()
 	else
 		return path.join(_OPTIONS["SDL_INSTALL_ROOT"],"bin","sdl2") .. "-config"
 	end
+end
+
+
+function androidsdlroot()
+	if _OPTIONS["targetos"]~="android" or not _OPTIONS["SDL_INSTALL_ROOT"] then
+		return nil
+	end
+
+	local root = _OPTIONS["SDL_INSTALL_ROOT"]
+	if os.isfile(path.join(root, "bin", "sdl2-config")) then
+		return nil
+	end
+
+	return root
 end
 
 
@@ -265,9 +283,19 @@ if BASE_TARGETOS=="unix" then
 				"/usr/openwin/lib",
 			}
 		end
-		local str = backtick(sdlconfigcmd() .. " --libs")
-		addlibfromstring(str)
-		addoptionsfromstring(str)
+		local androidsdl = androidsdlroot()
+		if androidsdl then
+			libdirs {
+				path.join(androidsdl, "lib"),
+			}
+			links {
+				"SDL2",
+			}
+		else
+			local str = backtick(sdlconfigcmd() .. " --libs")
+			addlibfromstring(str)
+			addoptionsfromstring(str)
+		end
 
 		if _OPTIONS["targetos"]~="haiku" and _OPTIONS["targetos"]~="android" then
 			links {

@@ -137,7 +137,7 @@ void x28_device<AddressBits, PageSizeBytes, TBLCUsec, TWCUsec, ProgramOnRead>::w
 		// We note which page we're starting to buffer, copy its current contents into the buffer
 		// so the buffer can be written into on a byte by byte basis, before being written back
 		// to storage during the programming cycle.
-		m_buffering_page = offset & PAGE_MASK;
+		m_buffering_page = offset & PAGE_ADDRESS_MASK;
 		const uint8_t *p = &(m_storage[m_buffering_page]);
 		std::copy(p, p + PageSizeBytes, std::begin(m_page_buffer));
 	}
@@ -157,7 +157,7 @@ void x28_device<AddressBits, PageSizeBytes, TBLCUsec, TWCUsec, ProgramOnRead>::w
 		// Another valid interpretation is to reject the write.
 		// Here, I choose the latter: any writes to an address within a different page
 		// are ignored, only those within the same page are accepted.
-		if ((offset & PAGE_MASK) == m_buffering_page) {
+		if ((offset & PAGE_ADDRESS_MASK) == m_buffering_page) {
 			m_page_buffer[offset & PAGE_OFFSET_MASK] = data;
 		}
 

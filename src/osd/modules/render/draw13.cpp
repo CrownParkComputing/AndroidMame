@@ -129,7 +129,10 @@ enum SDL_TEXFORMAT_E
 	SDL_TEXFORMAT_PALETTE16_ARGB1555,
 	SDL_TEXFORMAT_RGB15_ARGB1555,
 	SDL_TEXFORMAT_RGB15_PALETTED_ARGB1555,
-	SDL_TEXFORMAT_LAST = SDL_TEXFORMAT_RGB15_PALETTED_ARGB1555
+	SDL_TEXFORMAT_PALETTE16_RGB565,
+	SDL_TEXFORMAT_RGB15_RGB565,
+	SDL_TEXFORMAT_RGB15_PALETTED_RGB565,
+	SDL_TEXFORMAT_LAST = SDL_TEXFORMAT_RGB15_PALETTED_RGB565
 };
 
 struct copy_info_t
@@ -1128,14 +1131,17 @@ copy_info_t const video_sdl2::s_blit_info_default[] =
 
 	ENTRY(PALETTE16,        ARGB8888,   pal16_argb32),
 	ENTRY(PALETTE16,        RGB888,     pal16_argb32),
+	ENTRY(PALETTE16,        RGB565,     pal16_rgb565),
 
 	ENTRY(RGB15,            RGB555,     rgb15_rgb555),
 	ENTRY(RGB15,            ARGB1555,   rgb15_argb1555),
 	ENTRY(RGB15,            ARGB8888,   rgb15_argb32),
 	ENTRY(RGB15,            RGB888,     rgb15_argb32),
+	ENTRY(RGB15,            RGB565,     rgb15_rgb565),
 
 	ENTRY(RGB15_PALETTED,   ARGB8888,   rgb15pal_argb32),
 	ENTRY(RGB15_PALETTED,   RGB888,     rgb15pal_argb32),
+	ENTRY(RGB15_PALETTED,   RGB565,     rgb15pal_rgb565),
 
 	ENTRY(PALETTE16A,       ARGB8888,   pal16a_argb32),
 	ENTRY(PALETTE16A,       RGB888,     pal16a_rgb32),
@@ -1162,14 +1168,17 @@ copy_info_t const video_sdl2::s_blit_info_default[] =
 
 	ENTRY(PALETTE16,        ARGB8888,   rot_pal16_argb32),
 	ENTRY(PALETTE16,        RGB888,     rot_pal16_argb32),
+	ENTRY(PALETTE16,        RGB565,     rot_pal16_rgb565),
 
 	ENTRY(RGB15,            RGB555,     rot_rgb15_argb1555),
 	ENTRY(RGB15,            ARGB1555,   rot_rgb15_argb1555),
 	ENTRY(RGB15,            ARGB8888,   rot_rgb15_argb32),
 	ENTRY(RGB15,            RGB888,     rot_rgb15_argb32),
+	ENTRY(RGB15,            RGB565,     rot_rgb15_rgb565),
 
 	ENTRY(RGB15_PALETTED,   ARGB8888,   rot_rgb15pal_argb32),
 	ENTRY(RGB15_PALETTED,   RGB888,     rot_rgb15pal_argb32),
+	ENTRY(RGB15_PALETTED,   RGB565,     rot_rgb15pal_rgb565),
 
 	ENTRY(PALETTE16A,       ARGB8888,   rot_pal16a_argb32),
 	ENTRY(PALETTE16A,       RGB888,     rot_pal16a_rgb32),

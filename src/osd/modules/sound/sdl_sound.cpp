@@ -208,7 +208,11 @@ uint32_t sound_sdl::stream_sink_open(uint32_t node, std::string name, uint32_t r
 	dspec.freq = rate;
 	dspec.format = AUDIO_S16SYS;
 	dspec.channels = dev.m_channels;
+#ifdef SDLMAME_ANDROID
+	dspec.samples = 1024;
+#else
 	dspec.samples = 512;
+#endif
 	dspec.callback = sink_callback;
 	dspec.userdata = stream.get();
 
