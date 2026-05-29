@@ -23,13 +23,6 @@
 #include "rendutil.h"
 #include "uiinput.h"
 
-#if defined(__ANDROID__)
-#include <android/log.h>
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "MAME_VIDEO", __VA_ARGS__)
-#else
-#define LOGD(...)
-#endif
-
 #include <SDL3/SDL.h>
 
 
@@ -111,18 +104,6 @@ void sdl_osd_interface::video_exit()
 void sdl_osd_interface::update(bool skip_redraw)
 {
 	osd_common_t::update(skip_redraw);
-
-#if defined(__ANDROID__)
-	// While the app is backgrounded, the native surface is gone.
-	// Skip all rendering to avoid drawing to a dead/stale surface.
-	if (m_app_paused)
-	{
-		static int pause_log_count = 0;
-		if (pause_log_count++ % 60 == 0)
-			LOGD("update() skipped: m_app_paused=true (count=%d)", pause_log_count);
-		return;
-	}
-#endif
 
 	// if we're not skipping this redraw, update all windows
 	if (!skip_redraw)

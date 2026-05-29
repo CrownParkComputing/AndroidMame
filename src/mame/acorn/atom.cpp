@@ -1186,7 +1186,10 @@ void atom_state::atom(machine_config &config)
 	output_latch_device &cent_data_out(OUTPUT_LATCH(config, "cent_data_out"));
 	centronics.set_output_latch(cent_data_out);
 
-	QUICKLOAD(config, "quickload", "atm", attotime::from_seconds(2)).set_load_callback(FUNC(atom_state::quickload_cb));
+	//QUICKLOAD(config, "quickload", "atm", attotime::from_seconds(2)).set_load_callback(FUNC(atom_state::quickload_cb));
+	quickload_image_device &snapshot(QUICKLOAD(config, "quickload", "atm", attotime::from_seconds(2)));
+	snapshot.set_load_callback(FUNC(atom_state::quickload_cb));
+	snapshot.set_interface("atom_quik");
 
 	/* extension bus */
 	ACORN_BUS(config, m_bus);
@@ -1205,6 +1208,7 @@ void atom_state::atom(machine_config &config)
 	SOFTWARE_LIST(config, "rom_list").set_original("atom_rom");
 	SOFTWARE_LIST(config, "cass_list").set_original("atom_cass");
 	SOFTWARE_LIST(config, "flop_list").set_original("atom_flop");
+	SOFTWARE_LIST(config, "atom_quik").set_original("atom_quik");
 }
 
 

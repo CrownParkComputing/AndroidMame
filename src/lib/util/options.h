@@ -156,11 +156,12 @@ public:
 		void set_value_changed_handler(std::function<void(const char *)> &&handler) { m_value_changed_handler = std::move(handler); }
 		virtual void revert(int priority_hi, int priority_lo) { }
 
+		// check whether a value would be valid for this option
+		void validate(std::string_view value);
+
 	protected:
 		virtual void internal_set_value(std::string &&newvalue, bool perform_substitutions) = 0;
 		virtual bool internal_copy_value(const entry &that);
-
-		void validate(const std::string &value);
 
 	private:
 		const std::vector<std::string>              m_names;
@@ -203,6 +204,7 @@ public:
 
 	// parsing/input
 	void parse_command_line(const std::vector<std::string> &args, int priority, bool ignore_unknown_options = false);
+	void parse_parent_file(util::core_file &inifile, int priority, bool ignore_unknown_options, bool always_override); // MESSUI
 	void parse_ini_file(util::core_file &inifile, int priority, bool ignore_unknown_options, bool always_override);
 	void copy_from(const core_options &that);
 

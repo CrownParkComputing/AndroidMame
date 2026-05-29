@@ -1155,7 +1155,7 @@ void running_machine::nvram_load()
 		if (nvram.nvram_backup_enabled() && !file.open(nvram_filename(nvram.device())))
 		{
 			if (!nvram.nvram_load(file))
-				osd_printf_error("Error reading NVRAM file %s\n", file.filename());
+				osd_printf_info("Error reading NVRAM file %s\n", file.filename());
 			file.close();
 		}
 		else

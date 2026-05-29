@@ -65,7 +65,6 @@ public:
 	bool has_renderer() const { return m_renderer != nullptr; }
 	osd_renderer &renderer() const { return *m_renderer; }
 	void renderer_reset() { m_renderer.reset(); } // public because OSD object calls it directly during teardown
-	void renderer_create();
 
 	int index() const { return m_index; }
 	int prescale() const { return m_prescale; }
@@ -166,6 +165,7 @@ protected:
 
 	bool renderer_interactive() const;
 	bool renderer_sdl_needs_opengl() const;
+	void renderer_create();
 
 private:
 	void set_starting_view(int index, const char *defview, const char *view);

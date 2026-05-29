@@ -36,9 +36,33 @@
 
 void mame_options::parse_standard_inis(emu_options &options, std::ostream &error_stream, const game_driver *driver)
 {
+#if 0
 	// parse the INI file defined by the platform (e.g., "mame.ini")
 	// we do this twice so that the first file can change the INI path
-	parse_one_ini(options, emulator_info::get_configname(), OPTION_PRIORITY_MAME_INI);
+	parse_one_ini(options, emulator_info::get_configname(), OPTION_PRIORITY_SUBCMD);
+#endif
+#if 1
+	// parse exactly one of the main INI file to pick up and apply inipath and [no]readconfig
+	{
+		emu_file file(options.ini_path(), OPEN_FLAG_READ);
+		osd_printf_verbose("Attempting load of %s.ini\n", emulator_info::get_configname());
+		std::error_condition const filerr = file.open(std::string(emulator_info::get_configname()) + ".ini");
+		if (!filerr)
+		{
+			osd_printf_verbose("Parsing %s\n", file.fullpath());
+			try
+			{
+				options.parse_ini_file(static_cast<util::core_file &>(file), OPTION_PRIORITY_MAME_INI, true, false);
+			}
+			catch (options_exception const &ex)
+			{
+				util::stream_format(error_stream, "While parsing %s:\n%s\n", file.fullpath(), ex.message());
+			}
+		}
+	}
+
+	// now parse the main INI file following the potentially updated search path
+#endif
 	parse_one_ini(options, emulator_info::get_configname(), OPTION_PRIORITY_MAME_INI, &error_stream);
 
 	// debug mode: parse "debug.ini" as well
@@ -57,6 +81,9 @@ void mame_options::parse_standard_inis(emu_options &options, std::ostream &error
 			parse_one_ini(options, "vertical", OPTION_PRIORITY_ORIENTATION_INI, &error_stream);
 		else
 			parse_one_ini(options, "horizont", OPTION_PRIORITY_ORIENTATION_INI, &error_stream);
+
+		if ((cursystem->flags & machine_flags::MASK_TYPE) == machine_flags::TYPE_ARCADE)      // MAMEUI Robbbert 2023-03-23
+			parse_one_ini(options, "arcade", OPTION_PRIORITY_ORIENTATION_INI, &error_stream);
 
 		machine_config config(*cursystem, options);
 		for (const screen_device &device : screen_device_enumerator(config.root_device()))
@@ -89,10 +116,12 @@ void mame_options::parse_standard_inis(emu_options &options, std::ostream &error
 	// then parse the grandparent, parent, and system-specific INIs
 	int parent = driver_list::clone(*cursystem);
 	int gparent = (parent != -1) ? driver_list::clone(parent) : -1;
+	// MESSUI: ignore slots and images unless it is the gamename INI
 	if (gparent != -1)
 		parse_one_ini(options, driver_list::driver(gparent).name, OPTION_PRIORITY_GPARENT_INI, &error_stream);
 	if (parent != -1)
-		parse_one_ini(options, driver_list::driver(parent).name, OPTION_PRIORITY_PARENT_INI, &error_stream);
+		parse_parent_ini(options,driver_list::driver(parent).name, OPTION_PRIORITY_PARENT_INI, &error_stream);
+
 	parse_one_ini(options, cursystem->name, OPTION_PRIORITY_DRIVER_INI, &error_stream);
 }
 
@@ -120,25 +149,50 @@ void mame_options::parse_one_ini(emu_options &options, const char *basename, int
 		return;
 
 	// open the file; if we fail, that's ok
-	emu_file file(options.ini_path(), OPEN_FLAG_READ);
-	osd_printf_verbose("Attempting load of %s.ini\n", basename);
-	std::error_condition const filerr = file.open(std::string(basename) + ".ini");
+#if 1
+	std::string pp = options.ini_path(), bn = std::string(basename) + ".ini";
+	if (priority == OPTION_PRIORITY_SUBCMD) // MAMEUI force first read of mame.ini to be at emulator root
+	{
+		pp = ".\0";
+		priority = OPTION_PRIORITY_NORMAL; // anything lower than this should be ok too
+	}
+	emu_file file(pp, OPEN_FLAG_READ);
+	pp.append("\\").append(bn);
+	osd_printf_verbose("Attempting load of %s\n", pp);
+	std::error_condition const filerr = file.open(bn);  // already at ini folder, don't say it again
 	if (filerr)
 		return;
 
 	// parse the file
-	osd_printf_verbose("Parsing %s.ini\n", basename);
+	osd_printf_verbose("Parsing %s\n", pp);
 	try
 	{
-		options.parse_ini_file((util::core_file&)file, priority, priority < OPTION_PRIORITY_DRIVER_INI, false);
+		options.parse_ini_file(static_cast<util::core_file &>(file), priority, priority < OPTION_PRIORITY_DRIVER_INI, false);
 	}
-	catch (options_exception &ex)
+	catch (options_exception const &ex)
 	{
 		if (error_stream)
 			util::stream_format(*error_stream, "While parsing %s:\n%s\n", file.fullpath(), ex.message());
-		return;
 	}
-
+#endif
+#if 0
+	emu_file file(options.ini_path(), OPEN_FLAG_READ);
+	osd_printf_verbose("Attempting load of %s.ini\n", basename);
+	for (std::error_condition filerr = file.open(std::string(basename) + ".ini"); !filerr; filerr = file.open_next())
+	{
+		// parse the file
+		osd_printf_verbose("Parsing %s\n", file.fullpath());
+		try
+		{
+			options.parse_ini_file(static_cast<util::core_file &>(file), priority, priority < OPTION_PRIORITY_DRIVER_INI, false);
+		}
+		catch (options_exception const &ex)
+		{
+			if (error_stream)
+				util::stream_format(*error_stream, "While parsing %s:\n%s\n", file.fullpath(), ex.message());
+		}
+	}
+#endif
 }
 
 
@@ -198,5 +252,41 @@ void mame_options::populate_hashpath_from_args_and_inis(emu_options &options, co
 		catch (options_exception &)
 		{
 		}
+	}
+}
+
+
+
+// MESSUI
+//------------------------------------------------------------------------------------------
+//  parse_parent_ini - parse the game INI file - only want swpath
+//------------------------------------------------------------------------------------------
+
+void mame_options::parse_parent_ini(emu_options &options, const char *basename, int priority, std::ostream *error_stream)
+{
+	// don't parse if it has been disabled
+	if (!options.read_config())
+		return;
+
+	// open the file; if we fail, that's ok
+	std::string pp = options.ini_path(), bn = std::string(basename) + ".ini";
+	emu_file file(pp, OPEN_FLAG_READ);
+	pp.append("\\").append(bn);
+	osd_printf_verbose("Attempting load of parent %s\n", pp);
+	std::error_condition filerr = file.open(bn);
+	if (filerr)
+		return;
+
+	// parse the file
+	osd_printf_verbose("Parsing parent %s\n", pp);
+	try
+	{
+		options.parse_parent_file((util::core_file&)file, priority, priority < OPTION_PRIORITY_DRIVER_INI, false);
+	}
+	catch (options_exception &ex)
+	{
+		if (error_stream)
+			util::stream_format(*error_stream, "While parsing parent %s:\n%s\n", file.fullpath(), ex.message());
+		return;
 	}
 }

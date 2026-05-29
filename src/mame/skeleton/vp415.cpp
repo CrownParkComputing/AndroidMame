@@ -52,6 +52,8 @@
 #include "video/mb88303.h"
 
 #include "screen.h"
+#include "bus/nscsi/hd.h"
+#include "machine/nscsi_bus.h"
 
 namespace {
 
@@ -297,7 +299,8 @@ vp415_state::vp415_state(const machine_config &mconfig, device_type type, const 
 	: driver_device(mconfig, type, tag)
 	, m_datacpu(*this, DATACPU_TAG)
 	, m_datamcu(*this, DATAMCU_TAG)
-	, m_scsi(*this, SCSI_TAG)
+//	, m_scsi(*this, SCSI_TAG)
+	, m_scsi(*this, "ncr5385")
 	, m_drivecpu(*this, DRIVECPU_TAG)
 	, m_ctrlcpu(*this, CTRLCPU_TAG)
 	, m_ctrlmcu(*this, CTRLMCU_TAG)
@@ -421,7 +424,7 @@ void vp415_state::z80_program_map(address_map &map)
 void vp415_state::z80_io_map(address_map &map)
 {
 	map.global_mask(0xff);
-	map(0x00, 0x0f).m(SCSI_TAG, FUNC(ncr5385_device::map));
+	map(0x00, 0x0f).m(m_scsi, FUNC(ncr5385_device::map));
 	// 0x20, 0x21: Connected to A0 + D0..D7 of SLAVE i8041
 	map(0x34, 0x34).w(FUNC(vp415_state::sel34_w));
 	map(0x37, 0x37).r(FUNC(vp415_state::sel37_r));
@@ -714,6 +717,11 @@ static INPUT_PORTS_START( vp415 )
 		PORT_DIPSETTING(    0x00, "Off" )
 INPUT_PORTS_END
 
+static void scsi_devices(device_slot_interface &device)
+{
+	device.option_add("harddisk", NSCSI_HARDDISK);
+}
+
 void vp415_state::vp415(machine_config &config)
 {
 	// Module W: CPU Datagrabber
@@ -728,8 +736,18 @@ void vp415_state::vp415(machine_config &config)
 	m_datamcu->p2_out_cb().set(FUNC(vp415_state::data_mcu_port2_w));
 	m_datamcu->set_addrmap(AS_PROGRAM, &vp415_state::datamcu_program_map);
 
-	NCR5385(config, m_scsi, XTAL(8'000'000)/2); // Same clock signal as above, per schematic
-	m_scsi->irq().set(FUNC(vp415_state::cpu_int1_w));
+	auto &scsi(NSCSI_BUS(config, "scsi"));
+	NSCSI_CONNECTOR(config, "scsi:0", scsi_devices, nullptr, false);
+	NSCSI_CONNECTOR(config, "scsi:1", scsi_devices, nullptr, false);
+	NSCSI_CONNECTOR(config, "scsi:2", scsi_devices, nullptr, false);
+	NSCSI_CONNECTOR(config, "scsi:3", scsi_devices, nullptr, false);
+	NSCSI_CONNECTOR(config, "scsi:4", scsi_devices, nullptr, false);
+	NSCSI_CONNECTOR(config, "scsi:5", scsi_devices, nullptr, false);
+	NSCSI_CONNECTOR(config, "scsi:6", scsi_devices, nullptr, false);
+
+	NCR5385(config, m_scsi, 8'000'000/2);
+	scsi.set_external_device(7, m_scsi);
+	m_scsi->irq().set(DEVICE_SELF, FUNC(vp415_state::cpu_int1_w));
 
 	// Module S: Control
 	I8031(config, m_ctrlcpu, XTAL(11'059'200)); // 11.059MHz, per schematic

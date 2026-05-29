@@ -14,14 +14,12 @@
 #include "corestr.h"
 #include "osdcore.h"
 
-#include <locale>
-#include <string>
-
 #include <cassert>
 #include <cctype>
-#include <cstdarg>
 #include <cstdlib>
+#include <locale>
 #include <sstream>
+#include <unordered_set>
 
 
 const int core_options::MAX_UNADORNED_OPTIONS;
@@ -327,9 +325,10 @@ bool core_options::entry::internal_copy_value(const entry &that)
 //  entry::validate
 //-------------------------------------------------
 
-void core_options::entry::validate(const std::string &data)
+void core_options::entry::validate(std::string_view data)
 {
-	std::istringstream str(data);
+	std::istringstream str;
+	str.str(std::string(data));
 	str.imbue(std::locale::classic());
 
 	switch (type())
@@ -422,7 +421,8 @@ void core_options::entry::validate(const std::string &data)
 	case option_type::HEADER:
 	default:
 		// anything else is invalid
-		throw options_error_exception("Attempted to set invalid option %s\n", name());
+		//throw options_error_exception("Attempted to set invalid option %s\n", name());    // MESSUI - don't crash for no reason please
+		break;
 	}
 }
 
@@ -979,6 +979,7 @@ void core_options::parse_command_line(const std::vector<std::string> &args, int 
 
 void core_options::parse_ini_file(util::core_file &inifile, int priority, bool ignore_unknown_options, bool always_override)
 {
+	std::unordered_set<entry *> entries_set;
 	std::ostringstream error_stream;
 	condition_type condition = condition_type::NONE;
 
@@ -1036,13 +1037,48 @@ void core_options::parse_ini_file(util::core_file &inifile, int priority, bool i
 			}
 			continue;
 		}
-
+#if 1
+		//printf("%s = %s\n",optionname,optiondata);
 		// set the new data
 		do_set_value(*curentry, trim_spaces_and_quotes(optiondata), priority, error_stream, condition, true);
+#endif
+#if 0
+		// ensure INI files found earlier in the path have priority
+		std::string_view const trimmed = trim_spaces_and_quotes(optiondata);
+		if (entries_set.find(curentry.get()) != entries_set.end())
+		{
+			do_set_value(*curentry, trimmed, priority, error_stream, condition, true);
+		}
+		if (curentry->priority() < priority)
+		{
+			do_set_value(*curentry, trimmed, priority, error_stream, condition, true);
+			entries_set.emplace(curentry.get());
+		}
+		else
+		{
+			// just validate if the entry already has the same or higher priority and we didn't set it
+			try
+			{
+				curentry->validate(trimmed);
+			}
+			catch (options_warning_exception const &ex)
+			{
+				// we want to aggregate option exceptions
+				error_stream << ex.message();
+				condition = std::max(condition, condition_type::WARN);
+			}
+			catch (options_error_exception const &ex)
+			{
+				// we want to aggregate option exceptions
+				error_stream << ex.message();
+				condition = std::max(condition, condition_type::ERR);
+			}
+		}
+#endif
 	}
 
 	// did we have any errors that may need to be aggregated?
-	throw_options_exception_if_appropriate(condition, error_stream);
+	//throw_options_exception_if_appropriate(condition, error_stream);   // MESSUI 2023-06-01 - all exceptions are fatal
 }
 
 
@@ -1305,13 +1341,13 @@ void core_options::do_set_value(entry &curentry, std::string_view data, int prio
 	{
 		curentry.set_value(std::string(data), priority, false, perform_substitutions);
 	}
-	catch (options_warning_exception &ex)
+	catch (options_warning_exception const &ex)
 	{
 		// we want to aggregate option exceptions
 		error_stream << ex.message();
 		condition = std::max(condition, condition_type::WARN);
 	}
-	catch (options_error_exception &ex)
+	catch (options_error_exception const &ex)
 	{
 		// we want to aggregate option exceptions
 		error_stream << ex.message();
@@ -1394,3 +1430,135 @@ void core_options::simple_entry::revert(int priority_hi, int priority_lo)
 		set_priority(OPTION_PRIORITY_DEFAULT);
 	}
 }
+
+// MESSUI
+#if 0
+void core_options::parse_parent_file(util::core_file &inifile, int priority, bool ignore_unknown_options, bool always_override)
+{
+	std::ostringstream error_stream;
+	condition_type condition = condition_type::NONE;
+
+	// loop over lines in the file
+	char buffer[4096];
+	while (inifile.gets(buffer, std::size(buffer)) != nullptr)
+	{
+		// find the extent of the name
+		char *optionname;
+		for (optionname = buffer; *optionname != 0; optionname++)
+			if (!isspace((uint8_t)*optionname))
+				break;
+
+		if (optionname[0] == '#') // this statement is the only extra thing: we don't want slots or images copied to the clone
+		{
+			if (optionname[2] == 'S' && optionname[3] == 'L' && optionname[4] == 'O' && optionname[5] == 'T' )
+				break;
+			if (optionname[2] == 'I' && optionname[3] == 'M' && optionname[4] == 'A' && optionname[5] == 'G' )
+				break;
+		}
+
+		// skip comments
+		if (*optionname == 0 || *optionname == '#')
+			continue;
+
+		// scan forward to find the first space
+		char *temp;
+		for (temp = optionname; *temp != 0; temp++)
+			if (isspace((uint8_t)*temp))
+				break;
+
+		// if we hit the end early, print a warning and continue
+		if (*temp == 0)
+		{
+			condition = std::max(condition, condition_type::WARN);
+			util::stream_format(error_stream, "Warning: invalid line in INI: %s", buffer);
+			continue;
+		}
+
+		// NULL-terminate
+		*temp++ = 0;
+		char *optiondata = temp;
+
+		// scan the data, stopping when we hit a comment
+		bool inquotes = false;
+		for (temp = optiondata; *temp != 0; temp++)
+		{
+			if (*temp == '"')
+				inquotes = !inquotes;
+			if (*temp == '#' && !inquotes)
+				break;
+		}
+		*temp = 0;
+
+		// find our entry
+		entry::shared_ptr curentry = get_entry(optionname);
+		if (!curentry)
+		{
+			if (!ignore_unknown_options)
+			{
+				condition = std::max(condition, condition_type::WARN);
+				util::stream_format(error_stream, "Warning: unknown option in INI: %s\n", optionname);
+			}
+			continue;
+		}
+
+		// set the new data
+		do_set_value(*curentry, trim_spaces_and_quotes(optiondata), priority, error_stream, condition, true);
+	}
+}
+#endif
+void core_options::parse_parent_file(util::core_file &inifile, int priority, bool ignore_unknown_options, bool always_override)
+{
+	std::ostringstream error_stream;
+	condition_type condition = condition_type::NONE;
+
+	// loop over lines in the file
+	char buffer[4096] {};
+	while (inifile.gets(buffer, std::size(buffer)))
+	{
+		// process name
+		std::string oname = buffer;
+		if (oname.empty())
+			continue;
+		size_t osize = oname.find_first_of(" =\t");
+
+		// validate name length
+		if ((osize < 2) || (osize > 30))
+			continue;
+
+		// keep option name only
+		oname.erase(osize);
+
+		// process data
+		std::string odata = buffer;
+		if (osize < odata.length())
+			odata.erase(0,osize);
+		else
+			odata = " ";
+
+		// name to lowercase
+		std::transform(oname.begin(),oname.end(),oname.begin(), [] (unsigned char f) { return std::tolower(f); });
+
+		// only want swpath, discard remainder of file
+		if (oname != "swpath")
+			continue;
+
+		// find our entry
+		const char *optionname = oname.c_str();
+		const char *optiondata = odata.c_str();
+		//printf("option: %s == %s\n",optionname,optiondata);
+		entry::shared_ptr curentry = get_entry(optionname);
+		if (!curentry)
+		{
+			if (!ignore_unknown_options)
+			{
+				condition = std::max(condition, condition_type::WARN);
+				util::stream_format(error_stream, "Warning: unknown option in INI: %s\n", optionname);
+			}
+			continue;
+		}
+
+		// set the new data
+		do_set_value(*curentry, trim_spaces_and_quotes(optiondata), priority, error_stream, condition, true);
+	}
+}
+

@@ -244,7 +244,11 @@ void kayproii_state::kayproii(machine_config &config)
 	BEEP(config, m_beep, 950).add_route(ALL_OUTPUTS, "mono", 1.00); /* piezo-device needs to be measured */
 
 	/* devices */
-	QUICKLOAD(config, "quickload", "com,cpm", attotime::from_seconds(3)).set_load_callback(FUNC(kayproii_state::quickload_cb));
+	//QUICKLOAD(config, "quickload", "com,cpm", attotime::from_seconds(3)).set_load_callback(FUNC(kayproii_state::quickload_cb));
+	quickload_image_device &quik(QUICKLOAD(config, "quickload", "com,cpm", attotime::from_seconds(3)));
+	quik.set_load_callback(FUNC(kayproii_state::quickload_cb));
+	quik.set_interface("kaypro_quik");
+	SOFTWARE_LIST(config, "quik_list").set_original("kaypro_quik");
 
 	keytronic_connector_device &kbd(KEYTRONIC_CONNECTOR(config, "kbd", kaypro_keyboards, "kayproii"));
 	kbd.ser_out_callback().set("sio", FUNC(z80sio_device::rxb_w));
@@ -338,13 +342,19 @@ void kaypro84_state::kaypro484(machine_config &config)
 	m_crtc->set_char_width(8);
 	m_crtc->set_update_row_callback(FUNC(kaypro84_state::kaypro484_update_row));
 
-	QUICKLOAD(config, "quickload", "com,cpm", attotime::from_seconds(3)).set_load_callback(FUNC(kaypro84_state::quickload_cb));
+	//QUICKLOAD(config, "quickload", "com,cpm", attotime::from_seconds(3)).set_load_callback(FUNC(kaypro84_state::quickload_cb));
+	quickload_image_device &quik(QUICKLOAD(config, "quickload", "com,cpm", attotime::from_seconds(3)));
+	quik.set_load_callback(FUNC(kaypro84_state::quickload_cb));
+	quik.set_interface("kaypro_quik");
+	SOFTWARE_LIST(config, "quik_list").set_original("kaypro_quik");
 
 	keytronic_connector_device &kbd(KEYTRONIC_CONNECTOR(config, "kbd", kaypro_keyboards, "kaypro10"));
 	kbd.ser_out_callback().set("sio_1", FUNC(z80sio_device::rxb_w));
 	kbd.ser_out_callback().append("sio_1", FUNC(z80sio_device::syncb_w));
 
-	CLOCK(config, "kbdtxrxc", 16_MHz_XTAL / 16 / 13 / 16).signal_handler().set("sio_1", FUNC(z80sio_device::rxtxcb_w));
+	clock_device &kbdtxrxc(CLOCK(config, "kbdtxrxc"));
+	kbdtxrxc.set_period(attotime::from_hz(16_MHz_XTAL / 16 / 13 / 16));
+	kbdtxrxc.signal_handler().set("sio_1", FUNC(z80sio_device::rxtxcb_w));
 
 	CENTRONICS(config, m_centronics, centronics_devices, "printer");
 	m_centronics->busy_handler().set(FUNC(kaypro84_state::write_centronics_busy));

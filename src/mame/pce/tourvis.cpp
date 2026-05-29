@@ -178,10 +178,7 @@ http://blog.system11.org/?p=1943
 #include "emu.h"
 #include "pcecommn.h"
 
-#include "cpu/h6280/h6280.h"
 #include "cpu/i8085/i8085.h"
-#include "video/huc6260.h"
-#include "video/huc6270.h"
 #include "machine/i8155.h"
 
 #include "bus/generic/slot.h"
@@ -448,4 +445,4 @@ ROM_END
 
 } // anonymous namespace
 
-GAME( 19??, tourvis, 0, tourvision, tourvision, tourvision_state, init_pce_common, ROT0, u8"bootleg (TourVisión)", u8"TourVisión (PC Engine bootleg)", MACHINE_IS_BIOS_ROOT | MACHINE_NOT_WORKING )
+GAME( 19??, tourvis, 0, tourvision, tourvision, tourvision_state, init_pce_common, ROT0, u8"bootleg (TourVision)", u8"TourVision (PC Engine bootleg)", 0 )

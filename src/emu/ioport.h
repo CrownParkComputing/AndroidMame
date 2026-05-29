@@ -20,6 +20,7 @@
 #include "inpttype.h"
 
 #include "ioprocs.h"
+#include "fileio.h"
 
 #include <array>
 #include <cstdint>
@@ -97,7 +98,7 @@ enum ioport_type_class
 
 
 // default strings used in port definitions
-enum
+enum input_string_index
 {
 	INPUT_STRING_Off = 1,
 	INPUT_STRING_On,
@@ -334,6 +335,116 @@ typedef void(*ioport_constructor)(device_t &owner, ioport_list &portlist, std::o
 typedef device_delegate<ioport_value ()> ioport_field_read_delegate;
 typedef device_delegate<void (ioport_field &, u32, ioport_value, ioport_value)> ioport_field_write_delegate;
 typedef device_delegate<float (float)> ioport_field_crossmap_delegate;
+
+
+// ======================> inp_header
+
+// header at the front of INP files
+class inp_header
+{
+public:
+	// parameters
+	static constexpr unsigned MAJVERSION = 3;
+	static constexpr unsigned MINVERSION = 0;
+
+	bool read(emu_file &f)
+	{
+		return f.read(m_data, sizeof(m_data)) == sizeof(m_data);
+	}
+	bool write(emu_file &f) const
+	{
+		return f.write(m_data, sizeof(m_data)) == sizeof(m_data);
+	}
+
+	bool check_magic() const
+	{
+		return 0 == std::memcmp(MAGIC, m_data + OFFS_MAGIC, OFFS_BASETIME - OFFS_MAGIC);
+	}
+	u64 get_basetime() const
+	{
+		return
+				(u64(m_data[OFFS_BASETIME + 0]) << (0 * 8)) |
+				(u64(m_data[OFFS_BASETIME + 1]) << (1 * 8)) |
+				(u64(m_data[OFFS_BASETIME + 2]) << (2 * 8)) |
+				(u64(m_data[OFFS_BASETIME + 3]) << (3 * 8)) |
+				(u64(m_data[OFFS_BASETIME + 4]) << (4 * 8)) |
+				(u64(m_data[OFFS_BASETIME + 5]) << (5 * 8)) |
+				(u64(m_data[OFFS_BASETIME + 6]) << (6 * 8)) |
+				(u64(m_data[OFFS_BASETIME + 7]) << (7 * 8));
+	}
+	unsigned get_majversion() const
+	{
+		return m_data[OFFS_MAJVERSION];
+	}
+	unsigned get_minversion() const
+	{
+		return m_data[OFFS_MINVERSION];
+	}
+	std::string get_sysname() const
+	{
+		return get_string<OFFS_SYSNAME, OFFS_APPDESC>();
+	}
+	std::string get_appdesc() const
+	{
+		return get_string<OFFS_APPDESC, OFFS_END>();
+	}
+
+	void set_magic()
+	{
+		std::memcpy(m_data + OFFS_MAGIC, MAGIC, OFFS_BASETIME - OFFS_MAGIC);
+	}
+	void set_basetime(u64 time)
+	{
+		m_data[OFFS_BASETIME + 0] = u8((time >> (0 * 8)) & 0x00ff);
+		m_data[OFFS_BASETIME + 1] = u8((time >> (1 * 8)) & 0x00ff);
+		m_data[OFFS_BASETIME + 2] = u8((time >> (2 * 8)) & 0x00ff);
+		m_data[OFFS_BASETIME + 3] = u8((time >> (3 * 8)) & 0x00ff);
+		m_data[OFFS_BASETIME + 4] = u8((time >> (4 * 8)) & 0x00ff);
+		m_data[OFFS_BASETIME + 5] = u8((time >> (5 * 8)) & 0x00ff);
+		m_data[OFFS_BASETIME + 6] = u8((time >> (6 * 8)) & 0x00ff);
+		m_data[OFFS_BASETIME + 7] = u8((time >> (7 * 8)) & 0x00ff);
+	}
+	void set_version()
+	{
+		m_data[OFFS_MAJVERSION] = MAJVERSION;
+		m_data[OFFS_MINVERSION] = MINVERSION;
+	}
+	void set_sysname(std::string const &name)
+	{
+		set_string<OFFS_SYSNAME, OFFS_APPDESC>(name);
+	}
+	void set_appdesc(std::string const &desc)
+	{
+		set_string<OFFS_APPDESC, OFFS_END>(desc);
+	}
+
+private:
+	template <std::size_t BEGIN, std::size_t END> void set_string(std::string const &str)
+	{
+		std::size_t const used = (std::min<std::size_t>)(str.size() + 1, END - BEGIN);
+		std::memcpy(m_data + BEGIN, str.c_str(), used);
+		if ((END - BEGIN) > used)
+			std::memset(m_data + BEGIN + used, 0, (END - BEGIN) - used);
+	}
+	template <std::size_t BEGIN, std::size_t END> std::string get_string() const
+	{
+		char const *const begin = reinterpret_cast<char const *>(m_data + BEGIN);
+		return std::string(begin, std::find(begin, reinterpret_cast<char const *>(m_data + END), '\0'));
+	}
+
+	static constexpr std::size_t    OFFS_MAGIC       = 0x00;    // 0x08 bytes
+	static constexpr std::size_t    OFFS_BASETIME    = 0x08;    // 0x08 bytes (little-endian binary integer)
+	static constexpr std::size_t    OFFS_MAJVERSION  = 0x10;    // 0x01 bytes (binary integer)
+	static constexpr std::size_t    OFFS_MINVERSION  = 0x11;    // 0x01 bytes (binary integer)
+																// 0x02 bytes reserved
+	static constexpr std::size_t    OFFS_SYSNAME     = 0x14;    // 0x0c bytes (ASCII)
+	static constexpr std::size_t    OFFS_APPDESC     = 0x20;    // 0x20 bytes (ASCII)
+	static constexpr std::size_t    OFFS_END         = 0x40;
+
+	static u8 const                 MAGIC[OFFS_BASETIME - OFFS_MAGIC];
+
+	u8                              m_data[OFFS_END];
+};
 
 
 // ======================> input_device_default
@@ -1035,7 +1146,7 @@ public:
 	ioport_configurer(device_t &owner, ioport_list &portlist, std::ostream &errorbuf);
 
 	// static helpers
-	static const char *string_from_token(const char *string);
+	static const char *string_from_token(input_string_index string);
 
 	// port helpers
 	ioport_configurer& port_alloc(const char *tag);
@@ -1043,10 +1154,12 @@ public:
 
 	// field helpers
 	ioport_configurer& field_alloc(ioport_type type, ioport_value defval, ioport_value mask, const char *name = nullptr);
+	ioport_configurer& field_alloc(ioport_type type, ioport_value defval, ioport_value mask, input_string_index name);
 	ioport_configurer& field_add_char(std::initializer_list<char32_t> charlist);
 	ioport_configurer& field_add_code(input_seq_type which, input_code code);
 	ioport_configurer& field_set_way(int way) { m_curfield->m_way = way; return *this; }
-	ioport_configurer& field_set_name(const char *name) { assert(m_curfield != nullptr); m_curfield->m_name = string_from_token(name); return *this; }
+	ioport_configurer& field_set_name(const char *name) { assert(m_curfield != nullptr); m_curfield->m_name = name; return *this; }
+	ioport_configurer& field_set_name(input_string_index name) { assert(m_curfield != nullptr); m_curfield->m_name = string_from_token(name); return *this; }
 	ioport_configurer& field_set_player(int player) { m_curfield->m_player = player - 1; return *this; }
 	ioport_configurer& field_set_cocktail() { m_curfield->m_flags |= ioport_field::FIELD_FLAG_COCKTAIL; field_set_player(2); return *this; }
 	ioport_configurer& field_set_toggle() { m_curfield->m_flags |= ioport_field::FIELD_FLAG_TOGGLE; return *this; }
@@ -1071,10 +1184,12 @@ public:
 
 	// setting helpers
 	ioport_configurer& setting_alloc(ioport_value value, const char *name);
+	ioport_configurer& setting_alloc(ioport_value value, input_string_index name);
 
 	// misc helpers
 	ioport_configurer& set_condition(ioport_condition::condition_t condition, const char *tag, ioport_value mask, ioport_value value);
 	ioport_configurer& onoff_alloc(const char *name, ioport_value defval, ioport_value mask, const char *diplocation);
+	ioport_configurer& onoff_alloc(input_string_index name, ioport_value defval, ioport_value mask, const char *diplocation);
 
 	// allow UTF-8 strings to be used for names transparently
 	ioport_configurer& field_alloc(ioport_type type, ioport_value defval, ioport_value mask, const char8_t *name) { return field_alloc(type, defval, mask, reinterpret_cast<const char *>(name)); }
@@ -1106,12 +1221,8 @@ private:
 #define INPUT_CHANGED_MEMBER(name)  void name(ioport_field &field, u32 param, ioport_value oldval, ioport_value newval)
 #define DECLARE_INPUT_CHANGED_MEMBER(name)  void name(ioport_field &field, u32 param, ioport_value oldval, ioport_value newval)
 
-// macro for port changed callback functions (PORT_CROSSHAIR_MAPPER)
-#define CROSSHAIR_MAPPER_MEMBER(name)   float name(float linear_value)
-#define DECLARE_CROSSHAIR_MAPPER_MEMBER(name)   float name(float linear_value)
-
 // macro for wrapping a default string
-#define DEF_STR(str_num) ((const char *)INPUT_STRING_##str_num)
+#define DEF_STR(str_num) (INPUT_STRING_##str_num)
 
 
 

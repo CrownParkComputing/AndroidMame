@@ -621,8 +621,6 @@ bool video_manager::finish_screen_updates()
 	bool has_live_screen = false;
 	for (screen_device &screen : iter)
 	{
-		if (screen.partial_scan_hpos() > 0) // previous update ended mid-scanline
-			screen.update_now();
 		screen.update_partial(screen.visible_area().max_y);
 
 		if (machine().render().is_live(screen))
@@ -987,7 +985,7 @@ void video_manager::recompute_speed(const attotime &emutime)
 	}
 
 	// if we're past the "time-to-execute" requested, signal an exit
-	if (m_seconds_to_run != 0 && emutime.seconds() >= m_seconds_to_run)
+	if (m_seconds_to_run > 1 && emutime.seconds() >= m_seconds_to_run) // MESSUI 2022-12-03 Robbbert, nonag hack
 	{
 		// create a final screenshot
 		if (m_snap_native)

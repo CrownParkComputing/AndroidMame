@@ -2018,7 +2018,7 @@ void galaxold_state::_4in1(machine_config &config)
 	// video hardware
 	m_gfxdecode->set_info(gfx_4in1);
 
-	MCFG_VIDEO_START_OVERRIDE(galaxold_state,pisces)
+	MCFG_VIDEO_START_OVERRIDE(galaxold_state,4in1)
 }
 
 
