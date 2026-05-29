@@ -458,6 +458,7 @@ protected:
 	uint8_t m_stars_blink_state = 0;
 	rgb_t m_bullet_color[8];
 	uint8_t m_gfxbank[5]{};
+	uint8_t m_leftspriteclip = 16;
 };
 
 

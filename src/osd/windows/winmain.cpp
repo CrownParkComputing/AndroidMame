@@ -30,7 +30,6 @@
 #include <cstdarg>
 #include <cstdio>
 #include <locale>
-#include <mutex>
 #include <optional>
 #include <sstream>
 #include <thread>
@@ -75,30 +74,13 @@ protected:
 	std::numpunct<CharT> const &m_base;
 };
 
+//============================================================
+//  winui_output_error
+//============================================================
+// MAMEUI Robbbert, 2022-11-18. The removed code was a total horrible hack and froze the system.
 
 class winui_output_error : public osd_output
 {
-private:
-	struct ui_state
-	{
-		~ui_state()
-		{
-			if (thread)
-				thread->join();
-		}
-
-		std::ostringstream buffer;
-		std::optional<std::thread> thread;
-		std::mutex mutex;
-		bool active;
-	};
-
-	static ui_state &get_state()
-	{
-		static ui_state state;
-		return state;
-	}
-
 public:
 	virtual void output_callback(osd_output_channel channel, const util::format_argument_pack<char> &args) override
 	{
@@ -108,41 +90,12 @@ public:
 			if ((video_config.windowed == 0) && !osd_common_t::window_list().empty())
 				winwindow_toggle_full_screen();
 
-			auto &state(get_state());
-			std::lock_guard<std::mutex> guard(state.mutex);
-			util::stream_format(state.buffer, args);
-			if (!state.active)
-			{
-				if (state.thread)
-				{
-					state.thread->join();
-					state.thread = std::nullopt;
-				}
-				state.thread.emplace(
-						[] ()
-						{
-							auto &state(get_state());
-							std::string message;
-							while (true)
-							{
-								{
-									std::lock_guard<std::mutex> guard(state.mutex);
-									message = std::move(state.buffer).str();
-									if (message.empty())
-									{
-										state.active = false;
-										return;
-									}
-									state.buffer.str(std::string());
-								}
-								// Don't hold any locks lock while calling MessageBox.
-								// Parent window isn't set because MAME could destroy
-								// the window out from under us on a fatal error.
-								win_message_box_utf8(nullptr, message.c_str(), emulator_info::get_appname(), MB_OK);
-							}
-						});
-				state.active = true;
-			}
+			std::ostringstream buffer;
+			util::stream_format(buffer, args);
+			win_message_box_utf8(!osd_common_t::window_list().empty() ?
+				dynamic_cast<win_window_info &>(*osd_common_t::window_list().front()).platform_window() :
+					nullptr, buffer.str().c_str(), "MAMEUI", MB_OK);
+// MAMEUI end
 		}
 		else
 		{
@@ -186,16 +139,9 @@ static int is_double_click_start(int argc);
 //============================================================
 //  main
 //============================================================
-
-int main(int argc, char *argv[])
+//MESSUI start
+int main_(int argc, char *argv[])
 {
-	std::setlocale(LC_ALL, "");
-#if defined(_LIBCPP_VERSION) && defined(_UCRT)
-	// suppress digit grouping for now - too many things don't take it into consideration
-	std::locale const syslocale("");
-	std::locale const customlocale(std::locale(syslocale, new suppress_grouping<char>(syslocale)), new suppress_grouping<wchar_t>(syslocale));
-	std::locale::global(customlocale);
-#endif
 	std::vector<std::string> args = osd_get_command_line(argc, argv);
 
 	// use small output buffers on non-TTYs (i.e. pipes)
@@ -203,12 +149,6 @@ int main(int argc, char *argv[])
 		setvbuf(stdout, (char *) nullptr, _IOFBF, 64);
 	if (!isatty(fileno(stderr)))
 		setvbuf(stderr, (char *) nullptr, _IOFBF, 64);
-
-	// Disable legacy mouse to pointer event translation - it's broken:
-	// * No WM_POINTERLEAVE event when mouse pointer moves directly to an
-	//   overlapping window from the same process.
-	// * Still receive occasional WM_MOUSEMOVE events.
-	EnableMouseInPointer(FALSE);
 
 	// initialize common controls
 	InitCommonControls();
@@ -238,6 +178,71 @@ int main(int argc, char *argv[])
 		osd.register_options();
 		result = emulator_info::start_frontend(options, osd, args);
 		osd_output::pop(&winerror);
+	}
+
+	return result;
+}
+//MESSUI end
+int main(int argc, char *argv[])
+{
+#if defined(_UCRT)
+	SetConsoleOutputCP(CP_UTF8);
+	SetConsoleCP(CP_UTF8);
+	std::setlocale(LC_ALL, ".UTF-8");
+#if defined(_LIBCPP_VERSION)
+	// suppress digit grouping for now - too many things don't take it into consideration
+	std::locale const syslocale(".UTF-8");
+	std::locale const customlocale(std::locale(syslocale, new suppress_grouping<char>(syslocale)), new suppress_grouping<wchar_t>(syslocale));
+	std::locale::global(customlocale);
+#endif // defined(_LIBCPP_VERSION)
+#else // defined(_UCRT)
+	std::setlocale(LC_ALL, "");
+#endif // defined(_UCRT)
+
+	std::vector<std::string> args = osd_get_command_line(argc, argv);
+	bool const is_console = !win_is_gui_application() && !is_double_click_start(args.size());
+
+	// use small output buffers on non-TTYs (i.e. pipes)
+	if (!isatty(fileno(stdout)))
+		setvbuf(stdout, nullptr, _IOFBF, 64);
+	if (!isatty(fileno(stderr)))
+		setvbuf(stderr, nullptr, _IOFBF, 64);
+
+	// Disable legacy mouse to pointer event translation - it's broken:
+	// * No WM_POINTERLEAVE event when mouse pointer moves directly to an
+	//   overlapping window from the same process.
+	// * Still receive occasional WM_MOUSEMOVE events.
+	EnableMouseInPointer(FALSE);
+
+	// initialize common controls
+	InitCommonControls();
+
+	// set a handler to catch ctrl-c
+	SetConsoleCtrlHandler(control_handler, TRUE);
+
+	// Initialize crash diagnostics
+	diagnostics_module::get_instance()->init_crash_diagnostics();
+
+	// parse config and cmdline options
+	DWORD result;
+	{
+		windows_options options;
+		windows_osd_interface osd(options);
+		// if we're a GUI app, out errors to message boxes
+		// Initialize this after the osd interface so that we are first in the
+		// output order
+		winui_output_error winerror;
+		if (!is_console)
+		{
+			// if we are a GUI app, output errors to message boxes
+			osd_output::push(&winerror);
+			// make sure any console window that opened on our behalf is nuked
+			FreeConsole();
+		}
+		osd.register_options();
+		result = emulator_info::start_frontend(options, osd, args);
+		if (!is_console)
+			osd_output::pop(&winerror);
 	}
 
 	return result;

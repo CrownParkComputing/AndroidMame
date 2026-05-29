@@ -626,7 +626,11 @@ void comx35_state::base(machine_config &config, const XTAL clock)
 	m_kbe->d11_callback().set_ioport("D11");
 	m_kbe->da_callback().set_inputline(m_maincpu, COSMAC_INPUT_LINE_EF3);
 
-	QUICKLOAD(config, "quickload", "comx").set_load_callback(FUNC(comx35_state::quickload_cb));
+	//QUICKLOAD(config, "quickload", "comx").set_load_callback(FUNC(comx35_state::quickload_cb));
+	quickload_image_device &snapshot(QUICKLOAD(config, "quickload", "comx", attotime::from_seconds(1)));
+	snapshot.set_load_callback(FUNC(comx35_state::quickload_cb));
+	snapshot.set_interface("comx35_quik");
+	SOFTWARE_LIST(config, "comx35_quik").set_original("comx35_quik");
 
 	SPEAKER(config, "mono").front_center();
 

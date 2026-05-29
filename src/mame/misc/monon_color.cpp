@@ -153,17 +153,16 @@ private:
 
 	uint8_t spibuf_r()
 	{
-		return m_cart->read();
-	}
-
-	void spidir_w(int state)
-	{
-		m_cart->dir_w(state);
+		if (memregion("cartslot:rom"))
+			return m_cart->read();
+		else
+			return 0xff;
 	}
 
 	void spibuf_w(uint8_t data)
 	{
-		m_cart->write(data);
+		if (memregion("cartslot:rom"))
+			m_cart->write(data);
 	}
 
 	void get_music_command_bit(uint8_t bit);
@@ -625,6 +624,7 @@ void monon_color_state::out2_w(uint8_t data)
 			// nothing?
 		}
 		else
+		if (memregion("cartslot:rom"))
 		{
 			m_cart->set_ready();
 		}
@@ -944,7 +944,6 @@ void monon_color_state::monon_color(machine_config &config)
 	m_maincpu->port_out_cb<4>().set(FUNC(monon_color_state::out4_w));
 	m_maincpu->spi_in_cb().set(FUNC(monon_color_state::spibuf_r));
 	m_maincpu->spi_out_cb().set(FUNC(monon_color_state::spibuf_w));
-	m_maincpu->spi_out_dir_cb().set(FUNC(monon_color_state::spidir_w));
 	m_maincpu->dac_out_cb<0>().set(FUNC(monon_color_state::dacout0_w));
 	m_maincpu->dac_out_cb<1>().set(FUNC(monon_color_state::dacout1_w));
 

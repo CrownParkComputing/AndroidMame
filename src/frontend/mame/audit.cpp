@@ -512,9 +512,25 @@ media_auditor::summary media_auditor::summarize(const char *name, std::ostream *
 		if (output)
 		{
 			if (name)
-				util::stream_format(*output, "%-12s: %s", name, record.name());
+			{
+				if (record.type() == media_type::DISK)
+					util::stream_format(*output, "%-12s: %s%s", name, record.name(), ".chd"); // MESSUI: include .chd for disks
+				else
+				if (record.type() == media_type::SAMPLE)
+					util::stream_format(*output, "%-12s: %s%s", name, record.name(), ".wav"); // MESSUI: include .wav for samples
+				else
+					util::stream_format(*output, "%-12s: %s", name, record.name());
+			}
 			else
-				util::stream_format(*output, "%s", record.name());
+			{
+				if (record.type() == media_type::DISK)
+					util::stream_format(*output, "%s%s", record.name(), ".chd"); // MESSUI: include .chd for disks
+				else
+				if (record.type() == media_type::SAMPLE)
+					util::stream_format(*output, "%s%s", record.name(), ".wav"); // MESSUI: include .wav for samples
+				else
+					util::stream_format(*output, "%s", record.name());
+			}
 			if (record.expected_length() > 0)
 				util::stream_format(*output, " (%d bytes)", record.expected_length());
 			*output << " - ";
@@ -739,4 +755,81 @@ media_auditor::audit_record::audit_record(const char *name, media_type type)
 	, m_hashes()
 	, m_shared_device(nullptr)
 {
+}
+
+
+
+// MESSUI - only report problems that the user can fix
+media_auditor::summary media_auditor::winui_summarize(const char *name, std::string *output)
+{
+	if (m_record_list.empty())
+		return NONE_NEEDED;
+
+	// loop over records
+	summary overall_status = CORRECT;
+	for (audit_record const &record : m_record_list)
+	{
+		summary best_new_status = INCORRECT;
+
+		// skip anything that's fine
+		if ( (record.substatus() == audit_substatus::GOOD)
+			|| (record.substatus() == audit_substatus::GOOD_NEEDS_REDUMP)
+			|| (record.substatus() == audit_substatus::NOT_FOUND_NODUMP)
+			|| (record.substatus() == audit_substatus::FOUND_NODUMP)
+			|| (record.substatus() == audit_substatus::NOT_FOUND_OPTIONAL)
+			)
+			continue;
+
+		// output the game name, file name, and length (if applicable)
+		//if (output)
+		{
+			if (record.type() == media_type::DISK)
+				output->append(string_format("%-12s: %s%s", name, record.name(), ".chd"));
+			else
+				output->append(string_format("%-12s: %s", name, record.name()));
+			if (record.expected_length() > 0)
+				output->append(string_format(" (%d bytes)", record.expected_length()));
+			output->append(" - ");
+		}
+
+		// use the substatus for finer details
+		switch (record.substatus())
+		{
+			case audit_substatus::FOUND_NODUMP:
+				if (output) output->append("NO GOOD DUMP KNOWN\n");
+				best_new_status = BEST_AVAILABLE;
+				break;
+
+			case audit_substatus::FOUND_BAD_CHECKSUM:
+				if (output)
+				{
+					output->append("INCORRECT CHECKSUM:\n");
+					output->append(string_format("EXPECTED: %s\n", record.expected_hashes().macro_string().c_str()));
+					output->append(string_format("   FOUND: %s\n", record.actual_hashes().macro_string().c_str()));
+				}
+				break;
+
+			case audit_substatus::FOUND_WRONG_LENGTH:
+				if (output) output->append(string_format("INCORRECT LENGTH: %d bytes\n", record.actual_length()));
+				break;
+
+			case audit_substatus::NOT_FOUND:
+				if (output)
+				{
+					std::add_pointer_t<device_type> const shared_device = record.shared_device();
+					if (shared_device == NULL)
+						output->append("NOT FOUND\n");
+					else
+						output->append(string_format("NOT FOUND (%s)\n", shared_device->shortname()));
+				}
+				break;
+
+			default:
+				break;
+		}
+
+		// downgrade the overall status if necessary
+		overall_status = (std::max)(overall_status, best_new_status);
+	}
+	return overall_status;
 }

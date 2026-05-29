@@ -36,7 +36,7 @@ const options_entry emu_options::s_option_entries[] =
 	// config options
 	{ nullptr,                                           nullptr,     core_options::option_type::HEADER,     "CORE CONFIGURATION OPTIONS" },
 	{ OPTION_READCONFIG ";rc",                           "1",         core_options::option_type::BOOLEAN,    "enable loading of configuration files" },
-	{ OPTION_WRITECONFIG ";wc",                          "0",         core_options::option_type::BOOLEAN,    "write configuration to (driver).ini on exit" },
+	{ OPTION_WRITECONFIG ";wc",                          "1",         core_options::option_type::BOOLEAN,    "write configuration to (driver).ini on exit" },  // MESSUI
 
 	// search path options
 	{ nullptr,                                           nullptr,     core_options::option_type::HEADER,     "CORE SEARCH PATH OPTIONS" },
@@ -46,13 +46,13 @@ const options_entry emu_options::s_option_entries[] =
 	{ OPTION_SAMPLEPATH ";sp",                           "samples",   core_options::option_type::MULTIPATH,  "path to audio sample sets" },
 	{ OPTION_ARTPATH,                                    "artwork",   core_options::option_type::MULTIPATH,  "path to artwork files" },
 	{ OPTION_CTRLRPATH,                                  "ctrlr",     core_options::option_type::MULTIPATH,  "path to controller definitions" },
-	{ OPTION_INIPATH,                                    ".;ini;ini/presets",     core_options::option_type::MULTIPATH,     "path to ini files" },
+	{ OPTION_INIPATH,                                    "ini",       core_options::option_type::MULTIPATH,  "path to ini files" },   // MESSUI
 	{ OPTION_FONTPATH,                                   ".",         core_options::option_type::MULTIPATH,  "path to font files" },
 	{ OPTION_CHEATPATH,                                  "cheat",     core_options::option_type::MULTIPATH,  "path to cheat files" },
 	{ OPTION_CROSSHAIRPATH,                              "crosshair", core_options::option_type::MULTIPATH,  "path to crosshair files" },
 	{ OPTION_PLUGINSPATH,                                "plugins",   core_options::option_type::MULTIPATH,  "path to plugin files" },
 	{ OPTION_LANGUAGEPATH,                               "language",  core_options::option_type::MULTIPATH,  "path to UI translation files" },
-	{ OPTION_SWPATH,                                     "software",  core_options::option_type::MULTIPATH,  "path to loose software" },
+	{ OPTION_SWPATH,                                     "sw",        core_options::option_type::MULTIPATH,  "path to loose software" },  // MESSUI
 
 	// output directory options
 	{ nullptr,                                           nullptr,     core_options::option_type::HEADER,     "CORE OUTPUT DIRECTORY OPTIONS" },
@@ -81,7 +81,7 @@ const options_entry emu_options::s_option_entries[] =
 	{ OPTION_SNAPNAME,                                   "%g/%i",     core_options::option_type::STRING,     "override of the default snapshot/movie naming; %g == gamename, %i == index" },
 	{ OPTION_SNAPSIZE,                                   "auto",      core_options::option_type::STRING,     "specify snapshot/movie resolution (<width>x<height>) or 'auto' to use minimal size " },
 	{ OPTION_SNAPVIEW,                                   "auto",      core_options::option_type::STRING,     "snapshot/movie view - 'auto' for default, or 'native' for per-screen pixel-aspect views" },
-	{ OPTION_SNAPBILINEAR,                               "1",         core_options::option_type::BOOLEAN,    "specify if the snapshot/movie should have bilinear filtering applied" },
+	{ OPTION_SNAPBILINEAR,                               "0",         core_options::option_type::BOOLEAN,    "specify if the snapshot/movie should have bilinear filtering applied" },  // MESSUI
 	{ OPTION_STATENAME,                                  "%g",        core_options::option_type::STRING,     "override of the default state subfolder naming; %g == gamename" },
 	{ OPTION_BURNIN,                                     "0",         core_options::option_type::BOOLEAN,    "create burn-in snapshots for each screen" },
 
@@ -702,18 +702,21 @@ bool emu_options::add_and_remove_image_options()
 	}
 
 	// at this point we need to purge stray image options that may no longer be pertinent
+// MESSUI - don't blow up if option not found (occurs with BML3 with 1802 slot)
 	for (auto &opt_name : existing)
 	{
 		auto iter = m_image_options_canonical.find(*opt_name);
-		assert(iter != m_image_options_canonical.end());
+		if (iter != m_image_options_canonical.end())
+		{
 
-		// if this is represented in core_options, remove it
-		if (iter->second.option_entry())
-			remove_entry(*iter->second.option_entry());
+			// if this is represented in core_options, remove it
+			if (iter->second.option_entry())
+				remove_entry(*iter->second.option_entry());
 
-		// remove this option
-		m_image_options_canonical.erase(iter);
-		changed = true;
+			// remove this option
+			m_image_options_canonical.erase(iter);
+			changed = true;
+		}
 	}
 
 	return changed;
@@ -1332,3 +1335,4 @@ core_options::entry::shared_ptr image_option::setup_option_entry(std::vector<std
 	m_entry = entry;
 	return entry;
 }
+

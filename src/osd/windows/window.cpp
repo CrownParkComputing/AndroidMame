@@ -317,11 +317,11 @@ void windows_osd_interface::process_events()
 //  winwindow_video_window_proc_ui
 //  (window thread)
 //============================================================
-
-static LRESULT CALLBACK winwindow_video_window_proc_ui(HWND wnd, UINT message, WPARAM wparam, LPARAM lparam)
-{
-	return win_window_info::video_window_proc(wnd, message, wparam, lparam);
-}
+// commented out: MESSUI
+//static LRESULT CALLBACK winwindow_video_window_proc_ui(HWND wnd, UINT message, WPARAM wparam, LPARAM lparam)
+//{
+//	return win_window_info::video_window_proc(wnd, message, wparam, lparam);
+//}
 
 //============================================================
 //  is_mame_window
@@ -367,6 +367,86 @@ inline BOOL handle_mouse_wheel(windows_osd_interface &osd, int v, int h, LPARAM 
 	bool const handled = osd.handle_input_event(INPUT_EVENT_MOUSE_WHEEL, &args);
 
 	// When in lightgun mode or mouse mode, the mouse wheel may be routed to the input system
+	// because the mouse interactions in the UI are routed from the video_window_proc below
+	// we need to make sure they aren't suppressed in these cases.
+	return handled && !osd.options().lightgun() && !osd.options().mouse();
+}
+
+inline BOOL handle_pointer_update(windows_osd_interface &osd, HWND window, WPARAM wparam, LPARAM lparam)
+{
+	PointerUpdateEventArgs args;
+	args.window = window;
+	args.id = GET_POINTERID_WPARAM(wparam);
+	args.xpos = GET_X_LPARAM(lparam);
+	args.ypos = GET_Y_LPARAM(lparam);
+	args.vdelta = args.hdelta = 0;
+	args.isnew = IS_POINTER_NEW_WPARAM(wparam);
+	args.lost = IS_POINTER_CANCELED_WPARAM(wparam);
+	args.inrange = IS_POINTER_INRANGE_WPARAM(wparam);
+	args.incontact = IS_POINTER_INCONTACT_WPARAM(wparam);
+	args.primary = IS_POINTER_PRIMARY_WPARAM(wparam);
+	args.buttons[0] = IS_POINTER_FIRSTBUTTON_WPARAM(wparam);
+	args.buttons[1] = IS_POINTER_SECONDBUTTON_WPARAM(wparam);
+	args.buttons[2] = IS_POINTER_THIRDBUTTON_WPARAM(wparam);
+	args.buttons[3] = IS_POINTER_FOURTHBUTTON_WPARAM(wparam);
+	args.buttons[4] = IS_POINTER_FIFTHBUTTON_WPARAM(wparam);
+
+	bool const handled = osd.handle_input_event(INPUT_EVENT_POINTER_UPDATE, &args);
+
+	// When in lightgun mode or mouse mode, the pointer may be routed to the input system
+	// because the mouse interactions in the UI are routed from the video_window_proc below
+	// we need to make sure they aren't suppressed in these cases.
+	return handled && !osd.options().lightgun() && !osd.options().mouse();
+}
+
+inline BOOL handle_pointer_leave(windows_osd_interface &osd, HWND window, WPARAM wparam, LPARAM lparam)
+{
+	PointerUpdateEventArgs args;
+	args.window = window;
+	args.id = GET_POINTERID_WPARAM(wparam);
+	args.xpos = GET_X_LPARAM(lparam);
+	args.ypos = GET_Y_LPARAM(lparam);
+	args.vdelta = args.hdelta = 0;
+	args.isnew = false;
+	args.lost = true;
+	args.inrange = IS_POINTER_INRANGE_WPARAM(wparam);
+	args.incontact = IS_POINTER_INCONTACT_WPARAM(wparam);
+	args.primary = false;
+	args.buttons[0] = false;
+	args.buttons[1] = false;
+	args.buttons[2] = false;
+	args.buttons[3] = false;
+	args.buttons[4] = false;
+
+	bool const handled = osd.handle_input_event(INPUT_EVENT_POINTER_UPDATE, &args);
+
+	// When in lightgun mode or mouse mode, the pointer may be routed to the input system
+	// because the mouse interactions in the UI are routed from the video_window_proc below
+	// we need to make sure they aren't suppressed in these cases.
+	return handled && !osd.options().lightgun() && !osd.options().mouse();
+}
+
+inline BOOL handle_pointer_capture_change(windows_osd_interface &osd, HWND window, WPARAM wparam, LPARAM lparam)
+{
+	PointerUpdateEventArgs args;
+	args.window = window;
+	args.id = GET_POINTERID_WPARAM(wparam);
+	args.xpos = args.ypos = 0;
+	args.vdelta = args.hdelta = 0;
+	args.isnew = false;
+	args.lost = true;
+	args.inrange = false;
+	args.incontact = false;
+	args.primary = false;
+	args.buttons[0] = false;
+	args.buttons[1] = false;
+	args.buttons[2] = false;
+	args.buttons[3] = false;
+	args.buttons[4] = false;
+
+	bool const handled = osd.handle_input_event(INPUT_EVENT_POINTER_UPDATE, &args);
+
+	// When in lightgun mode or mouse mode, the pointer may be routed to the input system
 	// because the mouse interactions in the UI are routed from the video_window_proc below
 	// we need to make sure they aren't suppressed in these cases.
 	return handled && !osd.options().lightgun() && !osd.options().mouse();
@@ -459,6 +539,22 @@ void windows_osd_interface::process_events(bool ingame, bool nodispatch)
 
 					case WM_MOUSEHWHEEL:
 						dispatch = !handle_mouse_wheel(*this, 0, GET_WHEEL_DELTA_WPARAM(message.wParam), message.lParam);
+						break;
+
+					// forward pointer events to the input system
+					case WM_POINTERENTER:
+					case WM_POINTERDOWN:
+					case WM_POINTERUP:
+					case WM_POINTERUPDATE:
+						dispatch = !handle_pointer_update(*this, message.hwnd, message.wParam, message.lParam);
+						break;
+
+					case WM_POINTERLEAVE:
+						dispatch = !handle_pointer_leave(*this, message.hwnd, message.wParam, message.lParam);
+						break;
+
+					case WM_POINTERCAPTURECHANGED:
+						dispatch = !handle_pointer_capture_change(*this, message.hwnd, message.wParam, message.lParam);
 						break;
 
 					// forward keystrokes to the input system
@@ -656,6 +752,15 @@ void winwindow_update_cursor_state(running_machine &machine)
 
 	auto &window = static_cast<win_window_info &>(*osd_common_t::window_list().front());
 
+	// MESSUI - rationalise the mouse control
+	bool a = winwindow_has_focus(); // 1 = has focus
+	bool b = window.fullscreen();  // 1 = fullscreen
+	bool c = GetMenu(window.platform_window()) ? 1:0;   // 1 = NewUI enabled
+	bool d = machine.paused();  // 1 = paused
+
+#if 0
+	//bool e = WINOSD(machine)->should_hide_mouse();    // this is stupid since it should be active for most arcade games, so ignore it
+	//printf("focus=%X;fullscreen=%X;menu=%X;paused=%X;should_hide=%X\n",a,b,c,d,e);
 	// if we should hide the mouse cursor, then do it
 	// rules are:
 	//   1. we must have focus before hiding the cursor
@@ -680,6 +785,17 @@ void winwindow_update_cursor_state(running_machine &machine)
 		// allow cursor to move freely
 		window.release_pointer();
 	}
+#endif
+
+	if (a && b && !c && !d)
+		window.hide_pointer();
+	else
+		window.show_pointer();
+
+	if (a && b && !c)
+		window.capture_pointer();
+	else
+		window.release_pointer();
 }
 
 
@@ -970,12 +1086,19 @@ int win_window_info::complete_create()
 {
 	RECT client;
 	int tempwidth, tempheight;
+	HMENU menu = nullptr;  //MESSUI
 	HDC dc;
 
 	assert(GetCurrentThreadId() == window_threadid);
 
 	// get the monitor bounds
 	osd_rect monitorbounds = monitor()->position_size();
+
+	// This paragraph MESSUI
+	// Create NewUI menu if needed
+	if (downcast<windows_options &>(machine().options()).menu())
+		if (win_create_menu(machine(), &menu))
+			return 1;
 
 	// are we in worker UI mode?
 	HWND hwnd;
@@ -993,13 +1116,13 @@ int win_window_info::complete_create()
 		// create the window, but don't show it yet
 		hwnd = win_create_window_ex_utf8(
 				fullscreen() ? FULLSCREEN_STYLE_EX : WINDOW_STYLE_EX,
-				"MAME",
+				"MAME",   // do not change this!!
 				title().c_str(),
 				fullscreen() ? FULLSCREEN_STYLE : WINDOW_STYLE,
 				monitorbounds.left() + 20, monitorbounds.top() + 20,
 				monitorbounds.left() + 100, monitorbounds.top() + 100,
 				nullptr,//(osd_common_t::s_window_list != nullptr) ? osd_common_t::s_window_list->m_hwnd : nullptr,
-				nullptr,
+				menu,  // MESSUI
 				GetModuleHandleUni(),
 				nullptr);
 	}

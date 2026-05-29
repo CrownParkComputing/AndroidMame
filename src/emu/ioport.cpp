@@ -23,7 +23,6 @@
 #include "util/corestr.h"
 #include "util/ioprocsfilter.h"
 #include "util/language.h"
-#include "util/multibyte.h"
 #include "util/unicode.h"
 #include "util/xmlfile.h"
 
@@ -33,6 +32,7 @@
 #include <cctype>
 #include <ctime>
 #include <sstream>
+#include <type_traits>
 
 
 namespace {
@@ -111,7 +111,7 @@ inline u8 compute_shift(ioport_value mask)
 
 const struct
 {
-	u32 id;
+	input_string_index id;
 	const char *string;
 } input_port_default_strings[] =
 {
@@ -145,10 +145,10 @@ const struct
 	{ INPUT_STRING_3C_3C, "3 Coins/3 Credits" },
 	{ INPUT_STRING_2C_2C, "2 Coins/2 Credits" },
 	{ INPUT_STRING_1C_1C, "1 Coin/1 Credit" },
-	{ INPUT_STRING_3C_5C, "3 Coins/5 Credits" },
 	{ INPUT_STRING_4C_5C, "4 Coins/5 Credits" },
 	{ INPUT_STRING_3C_4C, "3 Coins/4 Credits" },
 	{ INPUT_STRING_2C_3C, "2 Coins/3 Credits" },
+	{ INPUT_STRING_3C_5C, "3 Coins/5 Credits" },
 	{ INPUT_STRING_4C_7C, "4 Coins/7 Credits" },
 	{ INPUT_STRING_2C_4C, "2 Coins/4 Credits" },
 	{ INPUT_STRING_1C_2C, "1 Coin/2 Credits" },
@@ -298,102 +298,6 @@ std::string substitute_player(std::string_view name, u8 player)
 	}
 	return result;
 }
-
-
-
-// ======================> inp_header
-
-// header at the front of INP files
-class inp_header
-{
-public:
-	// parameters
-	static constexpr unsigned MAJVERSION = 3;
-	static constexpr unsigned MINVERSION = 0;
-
-	bool read(emu_file &f)
-	{
-		return f.read(m_data, sizeof(m_data)) == sizeof(m_data);
-	}
-	bool write(emu_file &f) const
-	{
-		return f.write(m_data, sizeof(m_data)) == sizeof(m_data);
-	}
-
-	bool check_magic() const
-	{
-		return 0 == std::memcmp(MAGIC, m_data + OFFS_MAGIC, OFFS_BASETIME - OFFS_MAGIC);
-	}
-	u64 get_basetime() const
-	{
-		return get_u64le(m_data + OFFS_BASETIME);
-	}
-	unsigned get_majversion() const
-	{
-		return m_data[OFFS_MAJVERSION];
-	}
-	unsigned get_minversion() const
-	{
-		return m_data[OFFS_MINVERSION];
-	}
-	std::string get_sysname() const
-	{
-		return get_string<OFFS_SYSNAME, OFFS_APPDESC>();
-	}
-	std::string get_appdesc() const
-	{
-		return get_string<OFFS_APPDESC, OFFS_END>();
-	}
-
-	void set_magic()
-	{
-		std::memcpy(m_data + OFFS_MAGIC, MAGIC, OFFS_BASETIME - OFFS_MAGIC);
-	}
-	void set_basetime(u64 time)
-	{
-		put_u64le(m_data + OFFS_BASETIME, time);
-	}
-	void set_version()
-	{
-		m_data[OFFS_MAJVERSION] = MAJVERSION;
-		m_data[OFFS_MINVERSION] = MINVERSION;
-	}
-	void set_sysname(std::string const &name)
-	{
-		set_string<OFFS_SYSNAME, OFFS_APPDESC>(name);
-	}
-	void set_appdesc(std::string const &desc)
-	{
-		set_string<OFFS_APPDESC, OFFS_END>(desc);
-	}
-
-private:
-	template <std::size_t BEGIN, std::size_t END> void set_string(std::string const &str)
-	{
-		std::size_t const used = (std::min<std::size_t>)(str.size() + 1, END - BEGIN);
-		std::memcpy(m_data + BEGIN, str.c_str(), used);
-		if ((END - BEGIN) > used)
-			std::memset(m_data + BEGIN + used, 0, (END - BEGIN) - used);
-	}
-	template <std::size_t BEGIN, std::size_t END> std::string get_string() const
-	{
-		char const *const begin = reinterpret_cast<char const *>(m_data + BEGIN);
-		return std::string(begin, std::find(begin, reinterpret_cast<char const *>(m_data + END), '\0'));
-	}
-
-	static constexpr std::size_t    OFFS_MAGIC       = 0x00;    // 0x08 bytes
-	static constexpr std::size_t    OFFS_BASETIME    = 0x08;    // 0x08 bytes (little-endian binary integer)
-	static constexpr std::size_t    OFFS_MAJVERSION  = 0x10;    // 0x01 bytes (binary integer)
-	static constexpr std::size_t    OFFS_MINVERSION  = 0x11;    // 0x01 bytes (binary integer)
-																// 0x02 bytes reserved
-	static constexpr std::size_t    OFFS_SYSNAME     = 0x14;    // 0x0c bytes (ASCII)
-	static constexpr std::size_t    OFFS_APPDESC     = 0x20;    // 0x20 bytes (ASCII)
-	static constexpr std::size_t    OFFS_END         = 0x40;
-
-	static u8 const                 MAGIC[OFFS_BASETIME - OFFS_MAGIC];
-
-	u8                              m_data[OFFS_END];
-};
 
 } // anonymous namespace
 
@@ -3304,27 +3208,21 @@ ioport_configurer& ioport_configurer::field_set_gm_note(u8 note)
 //  ioport_token to a default string
 //-------------------------------------------------
 
-const char *ioport_configurer::string_from_token(const char *string)
+const char *ioport_configurer::string_from_token(input_string_index string)
 {
-	// 0 is an invalid index
-	if (string == nullptr)
-		return nullptr;
-
-	// if the index is greater than the count, assume it to be a pointer
-	if (uintptr_t(string) >= INPUT_STRING_COUNT)
-		return string;
-
-#if false // Set true, If you want to take care missing-token or wrong-sorting
+#if 0 // Set true, If you want to take care missing-token or wrong-sorting
 
 	// otherwise, scan the list for a matching string and return it
 	for (int index = 0; index < std::size(input_port_default_strings); index++)
-		if (input_port_default_strings[index].id == uintptr_t(string))
+		if (input_port_default_strings[index].id == string)
 			return input_port_default_strings[index].string;
 	return "(Unknown Default)";
 
 #else
 
-	return input_port_default_strings[uintptr_t(string)-1].string;
+	auto const index = std::underlying_type_t<input_string_index>(string) - 1;
+	assert(input_port_default_strings[index].id == string);
+	return input_port_default_strings[index].string;
 
 #endif
 }
@@ -3384,12 +3282,17 @@ ioport_configurer& ioport_configurer::field_alloc(ioport_type type, ioport_value
 	// append the field
 	if (type != IPT_UNKNOWN && type != IPT_UNUSED)
 		m_curport->m_active |= mask;
-	m_curfield = &m_curport->m_fieldlist.append(*new ioport_field(*m_curport, type, defval, mask, string_from_token(name)));
+	m_curfield = &m_curport->m_fieldlist.append(*new ioport_field(*m_curport, type, defval, mask, name));
 
 	// reset the current setting
 	m_cursetting = nullptr;
 	m_curshift = 0;
 	return *this;
+}
+
+ioport_configurer& ioport_configurer::field_alloc(ioport_type type, ioport_value defval, ioport_value mask, input_string_index name)
+{
+	return field_alloc(type, defval, mask, string_from_token(name));
 }
 
 
@@ -3444,8 +3347,13 @@ ioport_configurer& ioport_configurer::setting_alloc(ioport_value value, const ch
 		throw emu_fatalerror("setting_alloc called with no active field (value=%X name=%s)\n", value, name);
 
 	// append a new setting
-	m_cursetting = &m_curfield->m_settinglist.emplace_back(*m_curfield, value & m_curfield->mask(), string_from_token(name));
+	m_cursetting = &m_curfield->m_settinglist.emplace_back(*m_curfield, value & m_curfield->mask(), name);
 	return *this;
+}
+
+ioport_configurer& ioport_configurer::setting_alloc(ioport_value value, input_string_index name)
+{
+	return setting_alloc(value, string_from_token(name));
 }
 
 
@@ -3481,6 +3389,11 @@ ioport_configurer& ioport_configurer::onoff_alloc(const char *name, ioport_value
 	// clear cursettings set by setting_alloc
 	m_cursetting = nullptr;
 	return *this;
+}
+
+ioport_configurer& ioport_configurer::onoff_alloc(input_string_index name, ioport_value defval, ioport_value mask, const char *diplocation)
+{
+	return onoff_alloc(string_from_token(name), defval, mask, diplocation);
 }
 
 

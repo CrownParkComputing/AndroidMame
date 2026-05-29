@@ -649,7 +649,10 @@ void specnext_state::bank_update(u8 bank)
 
 	const bool is_rom = (bank >> 1) == 0;
 	if (m_bootrom_en && is_rom)
+	{
+		m_bank_boot_rom->set_entry(m_nr_10_coreid > 0 ? 1 : 0);
 		return views[bank].get().select(2);
+	}
 
 	if (machine_type_48())
 	{
@@ -2095,12 +2098,10 @@ void specnext_state::reg_w(offs_t nr_wr_reg, u8 nr_wr_dat)
 		if (m_nr_10_flashboot)
 		{
 			// At this point (used by Anti-Brick), requested core start loading by FPGA:
-			// 0 - Anti-Brick, 1 - Next (only one MAME emulates), 2+ - others
+			// 0 - Anti-Brick, 1 - Next, 2+ - others
 			LOG("Loading CORE: %d\n", m_nr_10_coreid);
-			// ... must reboot after loading
-			//m_nr_02_hard_reset = 1;
-			//machine().schedule_soft_reset();
-			// ... but we simulate "failure" and allow Antibrick rom to reach waiting timeout.
+			m_nr_02_hard_reset = 1;
+			machine().schedule_soft_reset();
 		}
 		break;
 	case 0x11:
@@ -2412,9 +2413,11 @@ void specnext_state::reg_w(offs_t nr_wr_reg, u8 nr_wr_dat)
 		nr_6c_tm_default_attr_w(nr_wr_dat);
 		break;
 	case 0x6e:
+		m_screen->update_now();
 		nr_6e_tilemap_base_w(BIT(nr_wr_dat, 7), BIT(nr_wr_dat, 0, 6));
 		break;
 	case 0x6f:
+		m_screen->update_now();
 		nr_6f_tilemap_tiles_w(BIT(nr_wr_dat, 7), BIT(nr_wr_dat, 0, 6));
 		break;
 	case 0x70:
@@ -2692,7 +2695,7 @@ TIMER_CALLBACK_MEMBER(specnext_state::irq_off)
 
 TIMER_CALLBACK_MEMBER(specnext_state::irq_on)
 {
-	LOGINTVVV("<Frame IRQ>\n");
+	LOGINTVVV("<ULA/Frame IRQ>\n");
 	m_im2_ula->irq_w(ASSERT_LINE);
 	if (m_nr_c0_int_mode_pulse_0_im2_1 == 0)
 		m_irq_off_timer->adjust(m_maincpu->clocks_to_attotime(32));
@@ -2829,6 +2832,7 @@ u8 specnext_state::do_m1(offs_t offset)
 	m_divmmc->automap_nmi_delayed_on_w(0);
 
 	m_divmmc->cpu_m1_n_w(1);
+	m_divmmc->cpu_mreq_n_w(1);
 	m_divmmc->clock_w();
 	bank_update(0, 2);
 
@@ -3049,10 +3053,10 @@ void specnext_state::map_io(address_map &map)
 	}));
 
 	map(0x2001, 0x2001).mirror(0x0ffc).lr8(NAME([]() {
-		return /*m_nr_d8_io_trap_fdc_en ? ... :*/ 0x00;
+		return /*m_nr_d8_io_trap_fdc_en ? ... :*/ 0xff;
 	}));
 	map(0x3001, 0x3001).mirror(0x0ffc).lrw8(NAME([]() {
-		return /*m_nr_d8_io_trap_fdc_en ? ... :*/ 0x00;
+		return /*m_nr_d8_io_trap_fdc_en ? ... :*/ 0xff;
 	}), NAME([this](u8 data) {
 		if (m_nr_d8_io_trap_fdc_en)
 		{
@@ -3075,7 +3079,10 @@ void specnext_state::map_io(address_map &map)
 	}), NAME([this](offs_t offset, u8 data) {
 		u8 chanel = offset >> 8;
 		if (port_ctc_io_en() && (chanel < 4))
+		{
 			m_ctc->write(chanel, data);
+			m_maincpu->abort_timeslice(); // TODO: Must the CTC take care of this?
+		}
 	}));
 	map(0x123b, 0x123b).lrw8(NAME([this]() {
 		return (m_port_123b_layer2_map_segment << 6) | (0b00 << 4) | (m_port_123b_layer2_map_shadow << 3) | (m_port_123b_layer2_map_rd_en << 2) | (m_port_123b_layer2_en << 1) | m_port_123b_layer2_map_wr_en;
@@ -3323,7 +3330,7 @@ void specnext_state::machine_start()
 	m_ram_pages = m_ram->size() / 0x2000;
 	for (auto i = 0; i < 8; i++)
 		m_bank_ram[i]->configure_entries(0, m_ram->size() / 0x2000, m_ram->pointer(), 0x2000);
-	m_bank_boot_rom->configure_entry(0, memregion("maincpu")->base());
+	m_bank_boot_rom->configure_entries(0, 2, memregion("maincpu")->base(), 0x2000);
 
 	const u8 *ram = m_ram->pointer() + 0x40000;
 	m_ula_scr->set_bram_bank5_ptr(m_bram_bank5.target());
@@ -3334,6 +3341,7 @@ void specnext_state::machine_start()
 	m_lores->set_bram_bank5_ptr(m_bram_bank5.target());
 
 	m_nr_02_hard_reset = 1;
+	m_nr_10_coreid = 0b00000; // Works but must be 1 if Next core bootrom selected
 
 	// Save
 	save_item(NAME(m_page_shadow));
@@ -3638,7 +3646,7 @@ void specnext_state::reset_hard()
 	m_nr_0a_mouse_button_reverse = 0;
 	m_nr_0a_mouse_dpi = 0b01;
 	m_nr_10_flashboot = 0;
-	m_nr_10_coreid = 0b00001;
+	//m_nr_10_coreid = 0b00001;
 	m_nr_7f_user_register_0 = 0xff;
 	m_nr_81_expbus_ula_override = 0;
 	m_nr_81_expbus_nmi_debounce_disable = 0;
@@ -4179,13 +4187,19 @@ ROM_START(tbblue)
 
 	ROM_SYSTEM_BIOS(0, "v30100", "Next Core v3.01.00")
 	ROMX_LOAD( "boot-30100.bin", 0x0000, 0x2000, CRC(ccbd55ba) SHA1(8b3c2a301f486904d1c74929b94845a7731bf230), ROM_BIOS(0))
+	ROMX_LOAD( "boot-30100.bin", 0x2000, 0x2000, CRC(ccbd55ba) SHA1(8b3c2a301f486904d1c74929b94845a7731bf230), ROM_BIOS(0))
+
 	ROM_SYSTEM_BIOS(1, "v30200ab", "Anti-Brick Core v3.02.00")
 	ROMX_LOAD( "boot-30200-ab.bin", 0x0000, 0x2000, CRC(1d16e9d4) SHA1(6f9c8771e5a9ef5a6b52a31b2e65f0698f0f5cfa), ROM_BIOS(1))
+	ROMX_LOAD( "boot-30100.bin", 0x2000, 0x2000, CRC(ccbd55ba) SHA1(8b3c2a301f486904d1c74929b94845a7731bf230), ROM_BIOS(1))
 
 	ROM_SYSTEM_BIOS(2, "v30204", "Next Core v3.02.04")
 	ROMX_LOAD( "boot-30204.bin", 0x0000, 0x2000, CRC(95118eb6) SHA1(acf5112e831be8c73952b8513fab33a427e88cf8), ROM_BIOS(2))
+	ROMX_LOAD( "boot-30204.bin", 0x2000, 0x2000, CRC(95118eb6) SHA1(acf5112e831be8c73952b8513fab33a427e88cf8), ROM_BIOS(2))
+
 	ROM_SYSTEM_BIOS(3, "v30204ab", "Anti-Brick Core v3.02.04")
 	ROMX_LOAD( "boot-30204-ab.bin", 0x0000, 0x2000, CRC(96c32007) SHA1(6c9fcbd282f7a18fb5a726386ac6fb9df209c36b), ROM_BIOS(3))
+	ROMX_LOAD( "boot-30204.bin", 0x2000, 0x2000, CRC(95118eb6) SHA1(acf5112e831be8c73952b8513fab33a427e88cf8), ROM_BIOS(3))
 ROM_END
 
 #define rom_specnext_ks1    rom_tbblue
@@ -4197,8 +4211,11 @@ ROM_START(specnext_ks3)
 
 	ROM_SYSTEM_BIOS(0, "v30204", "Next Core v3.02.04")
 	ROMX_LOAD( "boot-30204.bin", 0x0000, 0x2000, CRC(95118eb6) SHA1(acf5112e831be8c73952b8513fab33a427e88cf8), ROM_BIOS(0))
+	ROMX_LOAD( "boot-30204.bin", 0x2000, 0x2000, CRC(95118eb6) SHA1(acf5112e831be8c73952b8513fab33a427e88cf8), ROM_BIOS(0))
+
 	ROM_SYSTEM_BIOS(1, "v30204ab", "Anti-Brick Core v3.02.04")
 	ROMX_LOAD( "boot-30204-ab.bin", 0x0000, 0x2000, CRC(96c32007) SHA1(6c9fcbd282f7a18fb5a726386ac6fb9df209c36b), ROM_BIOS(1))
+	ROMX_LOAD( "boot-30204.bin", 0x2000, 0x2000, CRC(95118eb6) SHA1(acf5112e831be8c73952b8513fab33a427e88cf8), ROM_BIOS(1))
 ROM_END
 
 } // Anonymous namespace

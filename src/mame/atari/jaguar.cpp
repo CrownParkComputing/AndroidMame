@@ -1897,8 +1897,11 @@ void jaguar_state::jaguar(machine_config &config)
 	DAC_16BIT_R2R_TWOS_COMPLEMENT(config, m_rdac, 0).add_route(ALL_OUTPUTS, "speaker", 1.0, 1); // unknown DAC
 
 	/* quickload */
-	// need to skip BIOS asap for quickload to work (particularly after DSP sound fixes)
-	QUICKLOAD(config, "quickload", "abs,bin,cof,jag,prg,rom", attotime::from_usec(10)).set_load_callback(FUNC(jaguar_state::quickload_cb));
+	//QUICKLOAD(config, "quickload", "abs,bin,cof,jag,prg,rom", attotime::from_seconds(1)).set_load_callback(FUNC(jaguar_state::quickload_cb));
+	quickload_image_device &quik(QUICKLOAD(config, "quickload", "abs,bin,cof,jag,prg,rom", attotime::from_seconds(1)));
+	quik.set_load_callback(FUNC(jaguar_state::quickload_cb));
+	quik.set_interface("jaguar_quik");
+	SOFTWARE_LIST(config, "quik_list").set_original("jaguar_quik");
 
 	/* cartridge */
 	generic_cartslot_device &cartslot(GENERIC_CARTSLOT(config, "cartslot", generic_plain_slot, "jaguar_cart", "j64"));
@@ -2008,7 +2011,7 @@ std::pair<std::error_condition, std::string> jaguar_state::quickload_cb(snapshot
 	/* Now that we have the info, reload the file */
 	if ((start + quickload_size) < 0x200000)
 	{
-		memset(m_shared_ram, 0, 0x200000);
+		//memset(m_shared_ram, 0, 0x200000);
 		image.fseek(skip, SEEK_SET);
 		image.fread( &m_shared_ram[start/4], quickload_size-skip);
 		fix_endian(&m_shared_ram[start/4], quickload_size-skip);
@@ -2029,7 +2032,7 @@ std::pair<std::error_condition, std::string> jaguar_state::quickload_cb(snapshot
 
 	/* Transfer control to image */
 	m_maincpu->set_pc(start);
-	m_shared_ram[1]=quickload_begin;
+	m_shared_ram[1]=start;
 	return std::make_pair(std::error_condition(), std::string());
 }
 

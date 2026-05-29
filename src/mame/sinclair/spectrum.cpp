@@ -794,6 +794,7 @@ void spectrum_state::spectrum_common(machine_config &config)
 	m_cassette->set_interface("spectrum_cass");
 
 	SOFTWARE_LIST(config, "cass_list").set_original("spectrum_cass");
+	SOFTWARE_LIST(config, "spectrum_snap").set_original("spectrum_snap");
 }
 
 void spectrum_state::spectrum(machine_config &config)

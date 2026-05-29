@@ -187,7 +187,6 @@ private:
 
 	void process_window_event(SDL_Event const &event);
 	void process_textinput_event(SDL_Event const &event);
-	void recreate_all_renderers();
 
 	bool mouse_over_window() const { return m_mouse_over_window > 0; }
 	template <typename T> sdl_window_info *focus_window(T const &event) const;
@@ -198,7 +197,6 @@ private:
 	sdl_window_info *m_focus_window;
 	int m_mouse_over_window;
 	uint8_t m_modifier_keys;
-	bool m_app_paused;
 
 	std::chrono::steady_clock::time_point m_last_click_time;
 	int m_last_click_x;

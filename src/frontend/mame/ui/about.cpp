@@ -34,8 +34,8 @@ namespace {
 //  ctor
 //-------------------------------------------------
 
-menu_about::menu_about(mame_ui_manager &mui, render_container &container)
-	: menu_textbox(mui, container)
+menu_about::menu_about(mame_ui_manager &mui, render_target &target)
+	: menu_textbox(mui, target)
 	, m_header{
 			util::string_format(
 #ifdef MAME_DEBUG
@@ -44,7 +44,7 @@ menu_about::menu_about(mame_ui_manager &mui, render_container &container)
 					_("about-header", "%1$s %2$s (%3$s%4$sP%5$s)"),
 #endif
 					emulator_info::get_appname(),
-					bare_build_version,
+					long_build_version,
 					(sizeof(int) == sizeof(void *)) ? "I" : "",
 					(sizeof(long) == sizeof(void *)) ? "L" : (sizeof(long long) == sizeof(void *)) ? "LL" : "",
 					sizeof(void *) * 8),

@@ -19,7 +19,7 @@ namespace {
 class nes_vt32_base_state : public driver_device
 {
 public:
-	nes_vt32_base_state(const machine_config& mconfig, device_type type, const char* tag) :
+	nes_vt32_base_state(const machine_config &mconfig, device_type type, const char *tag) :
 		driver_device(mconfig, type, tag),
 		m_io0(*this, "IO0"),
 		m_io1(*this, "IO1"),
@@ -48,7 +48,7 @@ protected:
 	/* Misc */
 	uint32_t m_ahigh; // external banking bits
 
-	void configure_soc(nes_vt02_vt03_soc_device* soc);
+	void configure_soc(nes_vt02_vt03_soc_device *soc);
 
 	uint8_t upper_412c_r();
 	uint8_t upper_412d_r();
@@ -62,7 +62,7 @@ private:
 class nes_vt32_state : public nes_vt32_base_state
 {
 public:
-	nes_vt32_state(const machine_config& mconfig, device_type type, const char* tag) :
+	nes_vt32_state(const machine_config &mconfig, device_type type, const char *tag) :
 		nes_vt32_base_state(mconfig, type, tag),
 		m_soc(*this, "soc")
 	{ }
@@ -81,19 +81,19 @@ protected:
 class nes_vt32_unk_state : public nes_vt32_state
 {
 public:
-	nes_vt32_unk_state(const machine_config& mconfig, device_type type, const char* tag) :
+	nes_vt32_unk_state(const machine_config &mconfig, device_type type, const char *tag) :
 		nes_vt32_state(mconfig, type, tag),
 		m_prgrom(*this, "mainrom")
 	{ }
 
-	void nes_vt32_fp(machine_config& config);
-	void nes_vt32_2mb(machine_config& config);
-	void nes_vt32_8mb(machine_config& config);
-	void nes_vt32_16mb(machine_config& config);
-	void nes_vt32_32mb(machine_config& config);
-	void nes_vt32_4x16mb(machine_config& config);
+	void nes_vt32_fp(machine_config &config) ATTR_COLD;
+	void nes_vt32_2mb(machine_config &config) ATTR_COLD;
+	void nes_vt32_8mb(machine_config &config) ATTR_COLD;
+	void nes_vt32_16mb(machine_config &config) ATTR_COLD;
+	void nes_vt32_32mb(machine_config &config) ATTR_COLD;
+	void nes_vt32_4x16mb(machine_config &config) ATTR_COLD;
 
-	void nes_vt32_pal_32mb(machine_config& config);
+	void nes_vt32_pal_32mb(machine_config &config) ATTR_COLD;
 
 protected:
 	uint8_t vt_rom_banked_r(offs_t offset);
@@ -218,7 +218,7 @@ void nes_vt32_base_state::machine_reset()
 
 }
 
-void nes_vt32_base_state::configure_soc(nes_vt02_vt03_soc_device* soc)
+void nes_vt32_base_state::configure_soc(nes_vt02_vt03_soc_device *soc)
 {
 	soc->set_addrmap(AS_PROGRAM, &nes_vt32_state::vt_external_space_map_32mbyte);
 	soc->read_0_callback().set(FUNC(nes_vt32_base_state::in0_r));
@@ -288,7 +288,7 @@ void nes_vt32_unk_state::nes_vt32_fp(machine_config &config)
 	m_soc->force_bad_dma();
 }
 
-void nes_vt32_unk_state::nes_vt32_pal_32mb(machine_config& config)
+void nes_vt32_unk_state::nes_vt32_pal_32mb(machine_config &config)
 {
 	/* basic machine hardware */
 	NES_VT32_SOC_PAL(config, m_soc, NTSC_APU_CLOCK); // TODO, proper clocks etc. for PAL
@@ -304,7 +304,7 @@ void nes_vt32_unk_state::nes_vt32_pal_32mb(machine_config& config)
 	m_soc->set_addrmap(AS_PROGRAM, &nes_vt32_unk_state::vt_external_space_map_32mbyte);
 }
 
-void nes_vt32_unk_state::nes_vt32_4x16mb(machine_config& config)
+void nes_vt32_unk_state::nes_vt32_4x16mb(machine_config &config)
 {
 	nes_vt32_fp(config);
 	m_soc->set_addrmap(AS_PROGRAM, &nes_vt32_unk_state::vt_external_space_map_fp_2x32mbyte);
@@ -313,25 +313,25 @@ void nes_vt32_unk_state::nes_vt32_4x16mb(machine_config& config)
 	dynamic_cast<nes_vt09_soc_device&>(*m_soc).upper_read_412d_callback().set(FUNC(nes_vt32_unk_state::fcpocket_412d_r));
 }
 
-void nes_vt32_unk_state::nes_vt32_2mb(machine_config& config)
+void nes_vt32_unk_state::nes_vt32_2mb(machine_config &config)
 {
 	nes_vt32_fp(config);
 	m_soc->set_addrmap(AS_PROGRAM, &nes_vt32_unk_state::vt_external_space_map_2mbyte);
 }
 
-void nes_vt32_unk_state::nes_vt32_8mb(machine_config& config)
+void nes_vt32_unk_state::nes_vt32_8mb(machine_config &config)
 {
 	nes_vt32_fp(config);
 	m_soc->set_addrmap(AS_PROGRAM, &nes_vt32_unk_state::vt_external_space_map_8mbyte);
 }
 
-void nes_vt32_unk_state::nes_vt32_16mb(machine_config& config)
+void nes_vt32_unk_state::nes_vt32_16mb(machine_config &config)
 {
 	nes_vt32_fp(config);
 	m_soc->set_addrmap(AS_PROGRAM, &nes_vt32_unk_state::vt_external_space_map_16mbyte);
 }
 
-void nes_vt32_unk_state::nes_vt32_32mb(machine_config& config)
+void nes_vt32_unk_state::nes_vt32_32mb(machine_config &config)
 {
 	nes_vt32_fp(config);
 	m_soc->set_addrmap(AS_PROGRAM, &nes_vt32_unk_state::vt_external_space_map_32mbyte);
@@ -494,6 +494,11 @@ ROM_START( fingerd )
 	ROM_LOAD( "s29gl256n11tai02.u2", 0x00000, 0x2000000, CRC(58829d3c) SHA1(fab3b9914ec61f289509344b2d3f8a8b2f5bb5ba) )
 ROM_END
 
+ROM_START( orb300 ) // all games selectable
+	ROM_REGION( 0x1000000, "mainrom", 0 )
+	ROM_LOAD( "orb300arcade.u2", 0x00000, 0x1000000, CRC(25063e71) SHA1(14ee2921c24885ffeb877c0dca7842d1e3bf78fb) )
+ROM_END
+
 } // anonymous namespace
 
 
@@ -518,6 +523,9 @@ CONS( 201?, mymman,    0,  0,  nes_vt32_8mb, nes_vt32, nes_vt32_unk_state, empty
 
 // most games work, a few minor graphical issues common to the same games in other units
 CONS( 202?, typo240,   0,  0,  nes_vt32_16mb, nes_vt32, nes_vt32_unk_state, empty_init, "Typo", "Vintage Gamer 240-in-1", MACHINE_IMPERFECT_GRAPHICS )
+
+// games seem to run, although sub-menus use a currently unsupported video mode
+CONS( 202?, orb300,   0,  0,  nes_vt32_16mb, nes_vt32, nes_vt32_unk_state, empty_init, "Orb Gaming", "Mini Arcade Machine 300-in-1 (Orb Gaming)", MACHINE_NOT_WORKING | MACHINE_IMPERFECT_GRAPHICS )
 
 // speed challenge doesn't work
 CONS( 2021, retror30,  0,  0,  nes_vt32_32mb,      nes_vt32, nes_vt32_unk_state, empty_init, "Orb Gaming", "Retro Racer (30-in-1)", MACHINE_NOT_WORKING | MACHINE_IMPERFECT_GRAPHICS )

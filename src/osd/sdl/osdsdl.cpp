@@ -165,7 +165,6 @@ sdl_osd_interface::sdl_osd_interface(sdl_options &options) :
 	m_focus_window(nullptr),
 	m_mouse_over_window(0),
 	m_modifier_keys(0),
-	m_app_paused(false),
 	m_last_click_time(std::chrono::steady_clock::time_point::min()),
 	m_last_click_x(0),
 	m_last_click_y(0),
@@ -480,48 +479,6 @@ void sdl_osd_interface::process_events()
 		// handle UI events
 		switch (event.type)
 		{
-#if defined(__ANDROID__)
-		// Android lifecycle: the native surface is about to go away.
-		// Destroy all renderers immediately so that bgfx::shutdown()
-		// stops the render thread before the surface is actually torn down.
-		// Without this, bgfx's render thread keeps calling eglSwapBuffers
-		// on the dead surface, producing continuous BufferQueue errors and
-		// preventing recovery on resume.
-		case SDL_APP_WILLENTERBACKGROUND:
-			osd_printf_verbose("SDL: app entering background, destroying renderers\n");
-			m_app_paused = true;
-			for (auto const &window : osd_common_t::window_list())
-				if (window->has_renderer())
-					window->renderer_reset();
-			break;
-
-		case SDL_APP_DIDENTERFOREGROUND:
-			osd_printf_verbose("SDL: app returning to foreground, recreating renderers\n");
-			// Recreate renderers from scratch — bgfx::init() will bind
-			// to the new ANativeWindow and start a fresh render thread.
-			for (auto const &window : osd_common_t::window_list())
-			{
-				window->renderer_create();
-				if (window->has_renderer())
-					window->renderer().create();
-			}
-			m_app_paused = false;
-			break;
-
-		// GPU context / textures were lost (e.g. Android surface destroyed)
-		case SDL_RENDER_DEVICE_RESET:
-			osd_printf_verbose("SDL: render device reset, recreating renderers\n");
-			if (!m_app_paused)
-				recreate_all_renderers();
-			break;
-
-		case SDL_RENDER_TARGETS_RESET:
-			osd_printf_verbose("SDL: render targets reset, recreating renderers\n");
-			if (!m_app_paused)
-				recreate_all_renderers();
-			break;
-#endif // __ANDROID__
-
 		case SDL_WINDOWEVENT:
 			process_window_event(event);
 			break;
@@ -799,23 +756,6 @@ void sdl_osd_interface::process_window_event(SDL_Event const &event)
 	case SDL_WINDOWEVENT_CLOSE:
 		machine().schedule_exit();
 		break;
-
-#if defined(__ANDROID__)
-	case SDL_WINDOWEVENT_RESTORED:
-		osd_printf_verbose("SDL: window restored, ensuring renderer is valid\n");
-		if (m_app_paused)
-		{
-			// Renderers were destroyed on WILLENTERBACKGROUND, recreate
-			for (auto const &w : osd_common_t::window_list())
-			{
-				w->renderer_create();
-				if (w->has_renderer())
-					w->renderer().create();
-			}
-			m_app_paused = false;
-		}
-		break;
-#endif
 	}
 }
 
@@ -842,26 +782,6 @@ void sdl_osd_interface::process_textinput_event(SDL_Event const &event)
 				len -= chlen;
 				machine().ui_input().push_char_event(window->target(), ch);
 			}
-		}
-	}
-}
-
-
-void sdl_osd_interface::recreate_all_renderers()
-{
-	// Tear down and recreate each window's renderer so that fresh GPU
-	// resources (EGL context, textures, framebuffers) are allocated against
-	// the new Android surface.  This mirrors what toggle_full_screen() does
-	// but without destroying the SDL_Window (the surface is still valid).
-	for (auto const &window : osd_common_t::window_list())
-	{
-		if (window->has_renderer())
-		{
-			osd_printf_verbose("Recreating renderer for window %d\n", window->index());
-			window->renderer_reset();
-			window->renderer_create();
-			if (window->has_renderer())
-				window->renderer().create();
 		}
 	}
 }

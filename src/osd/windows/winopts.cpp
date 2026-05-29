@@ -24,6 +24,7 @@ options_entry const f_win_option_entries[] =
 
 	// video options
 	{ nullptr,                                        nullptr,    core_options::option_type::HEADER,     "WINDOWS VIDEO OPTIONS" },
+	{ WINOPTION_MENU,                                 "0",        core_options::option_type::BOOLEAN,    "Enable NewUI" },     // MESSUI
 	{ WINOPTION_ATTACH_WINDOW,                        "",         core_options::option_type::STRING,     "attach to arbitrary window" },
 
 	// post-processing options

@@ -1,23 +1,10 @@
 # MAME Arcade Android Build
 
-## Build Scripts
-
-| Script | Purpose |
-|--------|---------|
-| `./build_arcade.sh` | Build native lib (arm64/arm/x86/x64) |
-| `./build_apk.sh` | Build APK from native lib |
-
 ## Quick Start
 
 ```bash
-# 1. Build native library (arcade-only, SDL3)
-./build_arcade.sh
-
-# 2. Build APK
-./build_apk.sh
-
-# 3. Install
-adb install android-project/app/build/outputs/apk/debug/app-debug.apk
+# Build ARCADE64 (64-bit) from source
+make PTR64=1 SUBTARGET=arcade
 ```
 
 ## Requirements
@@ -50,6 +37,7 @@ adb install android-project/app/build/outputs/apk/debug/app-debug.apk
 - States persist across sessions
 
 ### Notes
+- Current source base tracks **ARCADE64 0.288**
 - Uses **SDL3** (not SDL2) - `ANDROID_OSD=sdl3`
 - 16KB page alignment enforced via `LDOPTS`
 - Runtime parity warning from SDL3 compat structs is benign - MAME uses native SDL3 API

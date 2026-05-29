@@ -45,7 +45,8 @@ not a full-fledged chess computer. Instead of a chess engine, it includes dozens
 of chess problems for the user to solve. Novag Super System TV Interface was
 included with the system, it's attached by default in MAME.
 
-Conceptualized by Noblet S.A. (Novag's distributor in France at the time).
+Conceptualized by Noblet S.A. (Novag's distributor in France at the time). It
+was programmed by Wayne Chow, not David Kittinger.
 
 Hardware notes:
 - PCB label: 100173 REV A
@@ -182,7 +183,7 @@ void sapphire_state::machine_start()
 
 void sapphire_state::init_chesstea()
 {
-	uint16_t *rom = (uint16_t*)memregion("maincpu")->base();
+	u16 *rom = (u16*)memregion("maincpu")->base();
 
 	// There's a bug in the serial routine, where it clears SSR TDRE, and then
 	// writes to TDR. The H8 documentation warns not to do this, since the next

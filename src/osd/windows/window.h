@@ -203,6 +203,9 @@ int winwindow_ui_is_paused(running_machine &machine);
 
 void winwindow_dispatch_message(running_machine &machine, MSG const &message);
 
+extern int win_create_menu(running_machine &machine, HMENU *menus); // MESSUI
+extern LRESULT CALLBACK winwindow_video_window_proc_ui(HWND wnd, UINT message, WPARAM wparam, LPARAM lparam); // MESSUI
+
 
 
 //============================================================

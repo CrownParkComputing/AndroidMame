@@ -105,13 +105,6 @@ void sdl_osd_interface::update(bool skip_redraw)
 {
 	osd_common_t::update(skip_redraw);
 
-#if defined(__ANDROID__)
-	// While the app is backgrounded, the native surface is gone.
-	// Skip all rendering to avoid drawing to a dead/stale surface.
-	if (m_app_paused)
-		return;
-#endif
-
 	// if we're not skipping this redraw, update all windows
 	if (!skip_redraw)
 	{

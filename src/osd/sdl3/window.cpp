@@ -953,9 +953,7 @@ int sdl_window_info::complete_create()
 	set_platform_window(sdlwindow);
 	renderer_create();
 
-#if !defined(__ANDROID__)
 	SDL_StartTextInput(sdlwindow);
-#endif
 
 	if (fullscreen() && video_config.switchres)
 	{

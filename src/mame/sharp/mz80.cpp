@@ -31,6 +31,7 @@ MZ80A ToDo:
 #include "screen.h"
 #include "softlist_dev.h"
 #include "speaker.h"
+#include "softlist_dev.h"
 
 #include "formats/mz_cas.h"
 

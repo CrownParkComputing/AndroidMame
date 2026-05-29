@@ -169,8 +169,9 @@ void mame_machine_manager::start_luaengine()
 		{
 			plugin_options::plugin *p = m_plugins->find(incl);
 			if (!p)
-				fatalerror("Fatal error: Could not load plugin: %s\n", incl);
-			p->m_start = true;
+				osd_printf_warning("Could not load plugin: %s\n", incl); // MESSUI - removed fatalerror
+			else
+				p->m_start = true;
 		}
 
 		// process excludes
@@ -178,8 +179,9 @@ void mame_machine_manager::start_luaengine()
 		{
 			plugin_options::plugin *p = m_plugins->find(excl);
 			if (!p)
-				fatalerror("Fatal error: Unknown plugin: %s\n", excl);
-			p->m_start = false;
+				osd_printf_warning("Unknown plugin: %s\n", excl); // MESSUI - removed fatalerror
+			else
+				p->m_start = false;
 		}
 	}
 
@@ -188,9 +190,9 @@ void mame_machine_manager::start_luaengine()
 	{
 		plugin_options::plugin *p = m_plugins->find(OPTION_CONSOLE);
 		if (!p)
-			fatalerror("Fatal error: Console plugin not found.\n");
-
-		p->m_start = true;
+			osd_printf_warning("Console plugin not found.\n"); // MESSUI - removed fatalerror
+		else
+			p->m_start = true;
 	}
 
 	m_lua->initialize();
@@ -434,17 +436,18 @@ std::vector<std::reference_wrapper<const std::string>> mame_machine_manager::mis
 }
 
 const char * emulator_info::get_bare_build_version() { return bare_build_version; }
+const char * emulator_info::get_long_build_version() { return long_build_version; }
 const char * emulator_info::get_build_version() { return build_version; }
 
 void emulator_info::display_ui_chooser(running_machine& machine)
 {
 	// force the UI to show the game select screen
 	mame_ui_manager &mui = mame_machine_manager::instance()->ui();
-	render_container &container = machine.render().ui_container();
+	render_target &target = machine.render().ui_target();
 	if (machine.options().ui() == emu_options::UI_SIMPLE)
-		ui::simple_menu_select_game::force_game_select(mui, container);
+		ui::simple_menu_select_game::force_game_select(mui, target);
 	else
-		ui::menu_select_game::force_game_select(mui, container);
+		ui::menu_select_game::force_game_select(mui, target);
 }
 
 int emulator_info::start_frontend(emu_options &options, osd_interface &osd, std::vector<std::string> &args)
@@ -461,7 +464,7 @@ int emulator_info::start_frontend(emu_options &options, osd_interface &osd, int 
 
 bool emulator_info::draw_user_interface(running_machine& machine)
 {
-	return mame_machine_manager::instance()->ui().update_and_render(machine.render().ui_container());
+	return mame_machine_manager::instance()->ui().update_and_render(machine.render().ui_target());
 }
 
 void emulator_info::periodic_check()

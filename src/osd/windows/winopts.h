@@ -22,6 +22,8 @@
 #define WINOPTION_PROFILE                   "profile"
 
 // video options
+// Next line: MESSUI
+#define WINOPTION_MENU                      "menu"
 #define WINOPTION_ATTACH_WINDOW             "attach_window"
 
 // core post-processing options
@@ -133,6 +135,7 @@ public:
 	int profile() const { return int_value(WINOPTION_PROFILE); }
 
 	// video options
+	bool menu() const { return bool_value(WINOPTION_MENU); }    // MESSUI
 	const char *attach_window() const { return value(WINOPTION_ATTACH_WINDOW); }
 
 	// core post-processing options

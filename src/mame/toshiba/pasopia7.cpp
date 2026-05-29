@@ -46,6 +46,7 @@
 #include "screen.h"
 #include "softlist_dev.h"
 #include "speaker.h"
+#include "softlist_dev.h"
 
 //#define VERBOSE 1
 #include "logmacro.h"

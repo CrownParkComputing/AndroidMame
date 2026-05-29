@@ -31,7 +31,8 @@ enum input_event
 	INPUT_EVENT_ARRIVAL,
 	INPUT_EVENT_REMOVAL,
 	INPUT_EVENT_MOUSE_BUTTON,
-	INPUT_EVENT_MOUSE_WHEEL
+	INPUT_EVENT_MOUSE_WHEEL,
+	INPUT_EVENT_POINTER_UPDATE
 };
 
 struct KeyPressEventArgs
@@ -51,9 +52,27 @@ struct MouseUpdateEventArgs
 	int ypos;
 };
 
+struct PointerUpdateEventArgs
+{
+	void *window;
+	unsigned id;
+	int xpos, ypos;
+	int vdelta, hdelta;
+	bool isnew;
+	bool lost;
+	bool inrange;
+	bool incontact;
+	bool primary;
+	bool buttons[5];
+};
+
 
 class windows_osd_interface : public osd_common_t
 {
+	// Access to exception filter static method
+	friend int main(int argc, char *argv[]);
+	friend int main_(int argc, char *argv[]); //MESSUI
+
 public:
 	// construction/destruction
 	windows_osd_interface(windows_options &options);

@@ -22,65 +22,6 @@
 #include <cstdio>
 #include <cstring>
 
-#if defined(__ANDROID__)
-#include <android/log.h>
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, "MAME_OSD", __VA_ARGS__)
-#else
-#define LOGD(...)
-#endif
-
-#if defined(__ANDROID__)
-// ── Android lifecycle event watcher ────────────────────────────────────
-// SDL_EVENT_WILL_ENTER_BACKGROUND / SDL_EVENT_DID_ENTER_FOREGROUND are
-// delivered on the Android main thread and MUST be handled via an event
-// watcher callback registered with SDL_AddEventWatch().  They are NOT
-// delivered through SDL_PollEvent().
-//
-// On WILL_ENTER_BACKGROUND we destroy all renderers so bgfx::shutdown()
-// stops its render thread before the native surface is torn down.
-// On DID_ENTER_FOREGROUND we recreate them against the new surface.
-static bool android_lifecycle_watcher(void *userdata, SDL_Event *event)
-{
-	auto *osd = static_cast<sdl_osd_interface *>(userdata);
-
-	switch (event->type)
-	{
-	case SDL_EVENT_WILL_ENTER_BACKGROUND:
-		LOGD("EVENT_WATCH: WILL_ENTER_BACKGROUND -> destroying renderers");
-		osd->set_app_paused(true);
-		for (auto const &window : osd_common_t::window_list())
-			if (window->has_renderer())
-				window->renderer_reset();
-		LOGD("EVENT_WATCH: renderers destroyed");
-		break;
-
-	case SDL_EVENT_DID_ENTER_FOREGROUND:
-		LOGD("EVENT_WATCH: DID_ENTER_FOREGROUND -> recreating renderers");
-		for (auto const &window : osd_common_t::window_list())
-		{
-			window->renderer_create();
-			if (window->has_renderer())
-				window->renderer().create();
-		}
-		osd->set_app_paused(false);
-		LOGD("EVENT_WATCH: renderers recreated");
-		break;
-
-	case SDL_EVENT_DID_ENTER_BACKGROUND:
-		LOGD("EVENT_WATCH: DID_ENTER_BACKGROUND");
-		break;
-
-	case SDL_EVENT_WILL_ENTER_FOREGROUND:
-		LOGD("EVENT_WATCH: WILL_ENTER_FOREGROUND");
-		break;
-
-	default:
-		break;
-	}
-	return true; // allow event to propagate
-}
-#endif // __ANDROID__
-
 
 namespace {
 
@@ -239,7 +180,6 @@ sdl_osd_interface::sdl_osd_interface(sdl_options &options) :
 	m_focus_window(nullptr),
 	m_mouse_over_window(0),
 	m_modifier_keys(0),
-	m_app_paused(false),
 	m_last_click_time(std::chrono::steady_clock::time_point::min()),
 	m_last_click_x(0),
 	m_last_click_y(0),
@@ -363,7 +303,9 @@ void sdl_osd_interface::init(running_machine &machine)
 		// survivable - it will still attempt to allocate mappings when it first sees devices
 	}
 
-// SDL_HINT_VIDEO_EXTERNAL_CONTEXT was removed in SDL3
+#if defined(SDLMAME_ANDROID)
+	SDL_SetHint(SDL_HINT_VIDEO_EXTERNAL_CONTEXT, "1");
+#endif
 	/* Initialize SDL */
 
 	if (!SDL_InitSubSystem(SDL_INIT_VIDEO))
@@ -377,11 +319,6 @@ void sdl_osd_interface::init(running_machine &machine)
 	defines_verbose();
 
 	osd_common_t::init_subsystems();
-
-#if defined(__ANDROID__)
-	SDL_AddEventWatch(android_lifecycle_watcher, this);
-	LOGD("Registered Android lifecycle event watcher");
-#endif
 
 	if (options().oslog())
 	{
@@ -556,21 +493,6 @@ void sdl_osd_interface::process_events()
 		// handle UI events
 		switch (event.type)
 		{
-#if defined(__ANDROID__)
-		// GPU context / textures were lost (e.g. Android surface destroyed)
-		case SDL_EVENT_RENDER_DEVICE_RESET:
-			LOGD("SDL_EVENT_RENDER_DEVICE_RESET");
-			if (!m_app_paused)
-				recreate_all_renderers();
-			break;
-
-		case SDL_EVENT_RENDER_TARGETS_RESET:
-			LOGD("SDL_EVENT_RENDER_TARGETS_RESET");
-			if (!m_app_paused)
-				recreate_all_renderers();
-			break;
-#endif // __ANDROID__
-
 			case SDL_EVENT_WINDOW_SHOWN:
 			case SDL_EVENT_WINDOW_HIDDEN:
 			case SDL_EVENT_WINDOW_EXPOSED:
@@ -719,7 +641,7 @@ void sdl_osd_interface::process_events()
 						break;
 					}
 #if SDL_VERSION_ATLEAST(3, 2, 12)
-					window->mouse_wheel(device, std::lround(event.wheel.y * 120));
+					window->mouse_wheel(device, std::lround(event.wheel.integer_y * 120));
 #else
 					window->mouse_wheel(device, std::lround(event.wheel.y * 120));
 #endif
@@ -782,11 +704,6 @@ void sdl_osd_interface::process_events()
 void sdl_osd_interface::osd_exit()
 {
 	osd_common_t::osd_exit();
-
-#if defined(__ANDROID__)
-	SDL_RemoveEventWatch(android_lifecycle_watcher, this);
-	LOGD("Removed Android lifecycle event watcher");
-#endif
 
 	SDL_QuitSubSystem(SDL_INIT_VIDEO);
 }
@@ -878,22 +795,6 @@ void sdl_osd_interface::process_window_event(SDL_Event const &event)
 		machine().schedule_exit();
 		break;
 
-#if defined(__ANDROID__)
-	case SDL_EVENT_WINDOW_RESTORED:
-		LOGD("SDL_EVENT_WINDOW_RESTORED (m_app_paused=%d)", m_app_paused);
-		if (m_app_paused)
-		{
-			for (auto const &w : osd_common_t::window_list())
-			{
-				w->renderer_create();
-				if (w->has_renderer())
-					w->renderer().create();
-			}
-			m_app_paused = false;
-		}
-		break;
-#endif
-
 	default:
 		break;
 	}
@@ -922,26 +823,6 @@ void sdl_osd_interface::process_textinput_event(SDL_Event const &event)
 				len -= chlen;
 				machine().ui_input().push_char_event(window->target(), ch);
 			}
-		}
-	}
-}
-
-
-void sdl_osd_interface::recreate_all_renderers()
-{
-	LOGD("recreate_all_renderers() called, window count=%zu", osd_common_t::window_list().size());
-	// Tear down and recreate each window's renderer so that fresh GPU
-	// resources (EGL context, textures, framebuffers) are allocated against
-	// the new Android surface.
-	for (auto const &window : osd_common_t::window_list())
-	{
-		if (window->has_renderer())
-		{
-			osd_printf_verbose("Recreating renderer for window %d\n", window->index());
-			window->renderer_reset();
-			window->renderer_create();
-			if (window->has_renderer())
-				window->renderer().create();
 		}
 	}
 }

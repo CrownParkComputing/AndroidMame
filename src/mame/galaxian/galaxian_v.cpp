@@ -557,10 +557,12 @@ void galaxian_state::sprites_clip(screen_device &screen, rectangle &cliprect)
 	// According to the schematics, it should be the first 16 pixels.
 	// See sprites_draw for an explanation of the +1.
 	rectangle clip = screen.visible_area();
-	if (m_flipscreen_x)
-		clip.max_x = (256 - (16 + 1)) * m_x_scale - 1;
-	else
-		clip.min_x = ((16 + 1) * m_x_scale);
+	//if (m_flipscreen_x)
+		//clip.max_x = (256 - (16 + 1)) * m_x_scale - 1;
+	//else
+		//clip.min_x = ((16 + 1) * m_x_scale);
+	clip.max_x = (256 - (m_flipscreen_x ? m_leftspriteclip : 0)) * m_x_scale - 1;
+	clip.min_x = (m_flipscreen_x ? 0 : m_leftspriteclip) * m_x_scale;
 
 	cliprect &= clip;
 }
@@ -592,6 +594,7 @@ void galaxian_state::sprites_draw(screen_device &screen, bitmap_rgb32 &bitmap, c
 		// the existence of +1 (sprite vs tile layer) is supported by a LOT of games
 		const int hoffset = 1;
 		uint8_t sx = base[3] + hoffset;
+		int sx1 = base[3] + hoffset;
 
 		// extend the sprite information
 		m_extend_sprite_info_ptr(base, &sx, &sy, &flipx, &flipy, &code, &color);
@@ -599,7 +602,7 @@ void galaxian_state::sprites_draw(screen_device &screen, bitmap_rgb32 &bitmap, c
 		// apply flipscreen in X direction
 		if (m_flipscreen_x)
 		{
-			sx = 240 - sx;
+			sx1 = 240 - sx1;
 			flipx = !flipx;
 		}
 
@@ -614,7 +617,7 @@ void galaxian_state::sprites_draw(screen_device &screen, bitmap_rgb32 &bitmap, c
 		m_gfxdecode->gfx(1)->transpen(bitmap,clip,
 				code, color,
 				flipx, flipy,
-				m_h0_start + m_x_scale * sx, sy, 0);
+				m_h0_start + m_x_scale * sx1, sy, 0);
 	}
 }
 

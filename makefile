@@ -6,7 +6,8 @@
 #
 ###########################################################################
 
-
+BARE_VERS := 0.288
+LONG_VERS := $(BARE_VERS).0
 
 ###########################################################################
 #################   BEGIN USER-CONFIGURABLE OPTIONS   #####################
@@ -62,7 +63,7 @@
 # ARCHOPTS_OBJC =
 # ARCHOPTS_OBJCXX =
 # OPT_FLAGS =
-# LDOPTS = -Wl,-z,max-page-size=16384
+# LDOPTS =
 
 # USE_SYSTEM_LIB_ASIO = 1
 # USE_SYSTEM_LIB_EXPAT = 1
@@ -1039,10 +1040,10 @@ endif
 ifneq ($(IGNORE_GIT),1)
 NEW_GIT_VERSION := $(shell git describe --dirty)
 else
-NEW_GIT_VERSION := unknown
+NEW_GIT_VERSION := $(strip $(shell date /T))
 endif
 ifeq ($(NEW_GIT_VERSION),)
-NEW_GIT_VERSION := unknown
+NEW_GIT_VERSION := automated
 endif
 
 GENIE := 3rdparty/genie/bin/$(GENIEOS)/genie$(EXE)
@@ -1054,7 +1055,6 @@ FULLTARGET := $(TARGET)$(SUBTARGET_FULL)
 endif
 PROJECTDIR := $(BUILDDIR)/projects/$(OSD)/$(FULLTARGET)
 PROJECTDIR_SDL := $(BUILDDIR)/projects/sdl/$(FULLTARGET)
-PROJECTDIR_ANDROID := $(BUILDDIR)/projects/$(or $(ANDROID_OSD),sdl)/$(FULLTARGET)
 PROJECTDIR_WIN := $(BUILDDIR)/projects/windows/$(FULLTARGET)
 
 .PHONY: all clean regenie generate FORCE
@@ -1137,6 +1137,24 @@ ifdef MSBUILD
 endif
 
 #-------------------------------------------------
+# Visual Studio 2026
+#-------------------------------------------------
+
+.PHONY: vs2026
+vs2026: generate
+	$(SILENT) $(GENIE) $(PARAMS) $(TARGET_PARAMS) vs2026
+ifdef MSBUILD
+	$(SILENT) msbuild.exe $(PROJECTDIR_WIN)/vs2026/$(PROJECT_NAME).sln $(MSBUILD_PARAMS)
+endif
+
+.PHONY: vs2026_clang
+vs2026_clang: generate
+	$(SILENT) $(GENIE) $(PARAMS) $(TARGET_PARAMS) --vs=clangcl vs2026
+ifdef MSBUILD
+	$(SILENT) msbuild.exe $(PROJECTDIR_WIN)/vs2026-clang/$(PROJECT_NAME).sln $(MSBUILD_PARAMS)
+endif
+
+#-------------------------------------------------
 # android-ndk
 #-------------------------------------------------
 
@@ -1145,19 +1163,8 @@ android-ndk:
 ifndef ANDROID_NDK_HOME
 	$(error ANDROID_NDK_HOME is not set)
 endif
-# SDL_INSTALL_ROOT may be auto-set by build-native-android.sh when building
-# SDL3 from the 3rdparty/SDL3 submodule; only require it for SDL2 or when the
-# submodule is absent.
-ifeq ($(SDL_MAJOR),2)
 ifndef SDL_INSTALL_ROOT
 	$(error SDL_INSTALL_ROOT is not set)
-endif
-else
-ifeq ($(wildcard $(CURDIR)/3rdparty/SDL3/CMakeLists.txt),)
-ifndef SDL_INSTALL_ROOT
-	$(error SDL_INSTALL_ROOT is not set and 3rdparty/SDL3 submodule is missing)
-endif
-endif
 endif
 ifeq ($(OS),windows)
 	$(eval CLANG_VERSION := $(shell $(ANDROID_NDK_HOME)/toolchains/llvm/prebuilt/windows-x86_64/bin/clang -dumpversion 2> /dev/null))
@@ -1173,49 +1180,49 @@ endif
 # android-arm
 #-------------------------------------------------
 
-$(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-arm/Makefile: makefile $(SCRIPTS) $(GENIE)
-	$(SILENT) $(GENIE) $(PARAMS) --gcc=android-arm --gcc_version=$(CLANG_VERSION) --osd=$(or $(ANDROID_OSD),sdl) --targetos=android --PLATFORM=arm --NOASM=1 $(MAKETYPE)
+$(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm/Makefile: makefile $(SCRIPTS) $(GENIE)
+	$(SILENT) $(GENIE) $(PARAMS) --gcc=android-arm --gcc_version=$(CLANG_VERSION) --osd=sdl --targetos=android --PLATFORM=arm --NOASM=1 $(MAKETYPE)
 
 .PHONY: android-arm
-android-arm: android-ndk generate $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-arm/Makefile
-	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-arm config=$(CONFIG) precompile
-	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-arm config=$(CONFIG)
+android-arm: android-ndk generate $(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm/Makefile
+	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm config=$(CONFIG) precompile
+	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm config=$(CONFIG)
 
 #-------------------------------------------------
 # android-arm64
 #-------------------------------------------------
 
-$(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-arm64/Makefile: makefile $(SCRIPTS) $(GENIE)
-	$(SILENT) $(GENIE) $(PARAMS) --gcc=android-arm64 --gcc_version=$(CLANG_VERSION) --osd=$(or $(ANDROID_OSD),sdl) --targetos=android --PLATFORM=arm64 $(MAKETYPE)
+$(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm64/Makefile: makefile $(SCRIPTS) $(GENIE)
+	$(SILENT) $(GENIE) $(PARAMS) --gcc=android-arm64 --gcc_version=$(CLANG_VERSION) --osd=sdl --targetos=android --PLATFORM=arm64 --NOASM=1 $(MAKETYPE)
 
 .PHONY: android-arm64
-android-arm64: android-ndk generate $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-arm64/Makefile
-	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-arm64 config=$(CONFIG) precompile
-	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-arm64 config=$(CONFIG)
+android-arm64: android-ndk generate $(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm64/Makefile
+	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm64 config=$(CONFIG) precompile
+	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_SDL)/$(MAKETYPE)-android-arm64 config=$(CONFIG)
 
 #-------------------------------------------------
 # android-x86
 #-------------------------------------------------
 
-$(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-x86/Makefile: makefile $(SCRIPTS) $(GENIE)
-	$(SILENT) $(GENIE) $(PARAMS) --gcc=android-x86 --gcc_version=$(CLANG_VERSION) --osd=$(or $(ANDROID_OSD),sdl) --targetos=android --PLATFORM=x86 $(MAKETYPE)
+$(PROJECTDIR_SDL)/$(MAKETYPE)-android-x86/Makefile: makefile $(SCRIPTS) $(GENIE)
+	$(SILENT) $(GENIE) $(PARAMS) --gcc=android-x86 --gcc_version=$(CLANG_VERSION) --osd=sdl --targetos=android --PLATFORM=x86 $(MAKETYPE)
 
 .PHONY: android-x86
-android-x86: android-ndk generate $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-x86/Makefile
-	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-x86 config=$(CONFIG) precompile
-	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-x86 config=$(CONFIG)
+android-x86: android-ndk generate $(PROJECTDIR_SDL)/$(MAKETYPE)-android-x86/Makefile
+	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_SDL)/$(MAKETYPE)-android-x86 config=$(CONFIG) precompile
+	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_SDL)/$(MAKETYPE)-android-x86 config=$(CONFIG)
 
 #-------------------------------------------------
 # android-x64
 #-------------------------------------------------
 
-$(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-x64/Makefile: makefile $(SCRIPTS) $(GENIE)
-	$(SILENT) $(GENIE) $(PARAMS) --gcc=android-x64 --gcc_version=$(CLANG_VERSION) --osd=$(or $(ANDROID_OSD),sdl) --targetos=android --PLATFORM=x64 $(MAKETYPE)
+$(PROJECTDIR_SDL)/$(MAKETYPE)-android-x64/Makefile: makefile $(SCRIPTS) $(GENIE)
+	$(SILENT) $(GENIE) $(PARAMS) --gcc=android-x64 --gcc_version=$(CLANG_VERSION) --osd=sdl --targetos=android --PLATFORM=x64 $(MAKETYPE)
 
 .PHONY: android-x64
-android-x64: android-ndk generate $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-x64/Makefile
-	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-x64 config=$(CONFIG) precompile
-	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_ANDROID)/$(MAKETYPE)-android-x64 config=$(CONFIG)
+android-x64: android-ndk generate $(PROJECTDIR_SDL)/$(MAKETYPE)-android-x64/Makefile
+	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_SDL)/$(MAKETYPE)-android-x64 config=$(CONFIG) precompile
+	$(SILENT) $(MAKE) $(MAKEPARAMS) -C $(PROJECTDIR_SDL)/$(MAKETYPE)-android-x64 config=$(CONFIG)
 
 #-------------------------------------------------
 # asmjs / Emscripten
@@ -1499,24 +1506,30 @@ endif
 
 ifeq (posix,$(SHELLTYPE))
 $(GENDIR)/version.cpp: makefile $(GENDIR)/git_desc | $(GEN_FOLDERS)
-	@echo '#define BARE_BUILD_VERSION "0.287"' > $@
+	@echo '#define LONG_BUILD_VERSION "$(LONG_VERS)"' > $@
+	@echo '#define BARE_BUILD_VERSION "$(BARE_VERS)"' >> $@
 	@echo '#define BARE_VCS_REVISION "$(NEW_GIT_VERSION)"' >> $@
 	@echo 'extern const char bare_build_version[];' >> $@
+	@echo 'extern const char long_build_version[];' >> $@
 	@echo 'extern const char bare_vcs_revision[];' >> $@
 	@echo 'extern const char build_version[];' >> $@
 	@echo 'const char bare_build_version[] = BARE_BUILD_VERSION;' >> $@
+	@echo 'const char long_build_version[] = LONG_BUILD_VERSION;' >> $@
 	@echo 'const char bare_vcs_revision[] = BARE_VCS_REVISION;' >> $@
-	@echo 'const char build_version[] = BARE_BUILD_VERSION " (" BARE_VCS_REVISION ")";' >> $@
+	@echo 'const char build_version[] = LONG_BUILD_VERSION " (" BARE_VCS_REVISION ")";' >> $@
 else
 $(GENDIR)/version.cpp: makefile $(GENDIR)/git_desc | $(GEN_FOLDERS)
-	@echo #define BARE_BUILD_VERSION "0.287" > $@
+	@echo #define LONG_BUILD_VERSION "$(LONG_VERS)" > $@
+	@echo #define BARE_BUILD_VERSION "$(BARE_VERS)" >> $@
 	@echo #define BARE_VCS_REVISION "$(NEW_GIT_VERSION)" >> $@
 	@echo extern const char bare_build_version[]; >> $@
+	@echo extern const char long_build_version[]; >> $@
 	@echo extern const char bare_vcs_revision[]; >> $@
 	@echo extern const char build_version[]; >> $@
 	@echo const char bare_build_version[] = BARE_BUILD_VERSION; >> $@
+	@echo const char long_build_version[] = LONG_BUILD_VERSION; >> $@
 	@echo const char bare_vcs_revision[] = BARE_VCS_REVISION; >> $@
-	@echo const char build_version[] = BARE_BUILD_VERSION " (" BARE_VCS_REVISION ")"; >> $@
+	@echo const char build_version[] = LONG_BUILD_VERSION " (" BARE_VCS_REVISION ")"; >> $@
 endif
 
 
@@ -1536,11 +1549,11 @@ endif
 # Regression tests
 #-------------------------------------------------
 
-include regtests/regtests.mak
+#include regtests/regtests.mak
 
-.PHONY: tests
+#.PHONY: tests
 
-tests: $(REGTESTS)
+#tests: $(REGTESTS)
 
 #-------------------------------------------------
 # Source cleanup

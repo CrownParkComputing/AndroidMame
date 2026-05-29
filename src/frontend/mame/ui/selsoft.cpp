@@ -380,8 +380,8 @@ private:
 //  ctor
 //-------------------------------------------------
 
-menu_select_software::menu_select_software(mame_ui_manager &mui, render_container &container, ui_system_info const &system)
-	: menu_select_launch(mui, container, true)
+menu_select_software::menu_select_software(mame_ui_manager &mui, render_target &target, ui_system_info const &system)
+	: menu_select_launch(mui, target, true)
 	, m_icon_paths()
 	, m_system(system)
 	, m_displaylist()
@@ -573,7 +573,7 @@ void menu_select_software::populate()
 
 		item_append(
 				m_displaylist[curitem].get().longname, m_displaylist[curitem].get().devicetype,
-				m_displaylist[curitem].get().parentname.empty() ? 0 : FLAG_INVERT, (void *)&m_displaylist[curitem].get());
+				m_displaylist[curitem].get().parentname.empty() ? 0 : FLAG_DEEMPHASIZE, (void *)&m_displaylist[curitem].get());
 	}
 
 	m_skip_main_items = 0;
@@ -714,7 +714,7 @@ void menu_select_software::get_selection(ui_software_info const *&software, ui_s
 
 void menu_select_software::show_config_menu(int index)
 {
-	menu::stack_push<menu_machine_configure>(ui(), container(), m_system, nullptr);
+	menu::stack_push<menu_machine_configure>(ui(), target(), m_system, nullptr);
 }
 
 
@@ -722,7 +722,7 @@ void menu_select_software::make_topbox_text(std::string &line0, std::string &lin
 {
 	// determine the text for the header
 	int vis_item = !m_search.empty() ? m_available_items : (m_available_items - 1);
-	line0 = string_format(_("%1$s %2$s ( %3$d / %4$d software packages )"), emulator_info::get_appname(), bare_build_version, vis_item, m_data->swinfo().size() - 1);
+	line0 = string_format(_("%1$s %2$s ( %3$d / %4$d software packages )"), emulator_info::get_appname(), long_build_version, vis_item, m_data->swinfo().size() - 1);
 	line1 = string_format(_("%1$s - select software"), m_system.description);
 
 	software_filter const *const it(m_data->current_filter());
@@ -747,7 +747,7 @@ void menu_select_software::filter_selected(int index)
 
 	m_data->get_filter(software_filter::type(index)).show_ui(
 			ui(),
-			container(),
+			target(),
 			[this] (software_filter &filter)
 			{
 				software_filter::type const new_type(filter.get_type());
